@@ -2,7 +2,7 @@ import { LoadingOutlined, MenuOutlined } from '@ant-design/icons';
 import { App, Button, Spin, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
 
-import { APP_VERSION } from '../../constants';
+import { APP_VERSION, CONTAINER_ARCH } from '../../constants';
 import { type DiskUsage, diskApi } from '../../entity/disk';
 import {
   type UserProfile,
@@ -365,6 +365,8 @@ export const MainScreenComponent = () => {
 
           <div className="absolute bottom-1 left-2 mb-[0px] hidden text-sm text-gray-400 md:block">
             v{APP_VERSION}
+            <br />
+            {CONTAINER_ARCH}
           </div>
         </div>
       )}

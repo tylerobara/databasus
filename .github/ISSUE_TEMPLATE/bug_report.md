@@ -4,7 +4,9 @@ about: Report a bug or unexpected behavior in Databasus
 labels: bug
 ---
 
-## Databasus version
+## Databasus version (screenshot)
+
+It is displayed in the bottom left corner of the Databasus UI. Please attach screenshot, not just version text
 
 <!-- e.g. 1.4.2 -->
 
