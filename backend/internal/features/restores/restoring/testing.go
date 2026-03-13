@@ -324,7 +324,7 @@ func CreateTestRestore(
 			Port:     5432,
 			Username: "test",
 			Password: "test",
-			Database: stringPtr("testdb"),
+			Database: func() *string { s := "testdb"; return &s }(),
 			Version:  "16",
 		},
 	}
@@ -335,8 +335,4 @@ func CreateTestRestore(
 	}
 
 	return restore
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

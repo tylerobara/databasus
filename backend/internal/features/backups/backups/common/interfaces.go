@@ -7,6 +7,10 @@ type CountingWriter struct {
 	BytesWritten int64
 }
 
+func NewCountingWriter(writer io.Writer) *CountingWriter {
+	return &CountingWriter{Writer: writer}
+}
+
 func (cw *CountingWriter) Write(p []byte) (n int, err error) {
 	n, err = cw.Writer.Write(p)
 	cw.BytesWritten += int64(n)
@@ -15,8 +19,4 @@ func (cw *CountingWriter) Write(p []byte) (n int, err error) {
 
 func (cw *CountingWriter) GetBytesWritten() int64 {
 	return cw.BytesWritten
-}
-
-func NewCountingWriter(writer io.Writer) *CountingWriter {
-	return &CountingWriter{Writer: writer}
 }

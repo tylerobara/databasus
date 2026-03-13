@@ -1,6 +1,7 @@
 package email_notifier
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -207,7 +208,7 @@ func (e *EmailNotifier) createImplicitTLSClient() (*smtp.Client, func(), error) 
 	}
 	dialer := &net.Dialer{Timeout: DefaultTimeout}
 
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	conn, err := (&tls.Dialer{NetDialer: dialer, Config: tlsConfig}).DialContext(context.Background(), "tcp", addr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to SMTP server: %w", err)
 	}

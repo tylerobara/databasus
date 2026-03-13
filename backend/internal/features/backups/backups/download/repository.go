@@ -3,6 +3,7 @@ package backups_download
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,7 +31,7 @@ func (r *DownloadTokenRepository) FindByToken(token string) (*DownloadToken, err
 		Where("token = ?", token).
 		First(&downloadToken).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

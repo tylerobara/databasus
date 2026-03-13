@@ -2,6 +2,7 @@ package discord_notifier
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,7 +48,7 @@ func (d *DiscordNotifier) Send(
 		fullMessage = fmt.Sprintf("%s\n\n%s", heading, message)
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"content": fullMessage,
 	}
 
@@ -56,7 +57,7 @@ func (d *DiscordNotifier) Send(
 		return fmt.Errorf("failed to marshal Discord payload: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", webhookURL, bytes.NewReader(jsonPayload))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", webhookURL, bytes.NewReader(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

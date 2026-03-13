@@ -167,7 +167,7 @@ func (s *GoogleDriveStorage) GetFile(
 				return err
 			}
 
-			resp, err := driveService.Files.Get(fileIDGoogle).Download()
+			resp, err := driveService.Files.Get(fileIDGoogle).Download() //nolint:bodyclose
 			if err != nil {
 				return fmt.Errorf("failed to download file from Google Drive: %w", err)
 			}
@@ -358,7 +358,7 @@ func (s *GoogleDriveStorage) withRetryOnAuth(
 			if strings.Contains(refreshErr.Error(), "invalid_grant") ||
 				strings.Contains(refreshErr.Error(), "refresh token") {
 				return fmt.Errorf(
-					"google drive refresh token has expired. Please re-authenticate and update your token configuration. Original error: %w. Refresh error: %v",
+					"google drive refresh token has expired. Please re-authenticate and update your token configuration. Original error: %w. Refresh error: %w",
 					err,
 					refreshErr,
 				)
@@ -488,7 +488,7 @@ func (s *GoogleDriveStorage) refreshToken(encryptor encryption.FieldEncryptor) e
 // maskSensitiveData masks sensitive information in token JSON for logging
 func maskSensitiveData(tokenJSON string) string {
 	// Replace sensitive values with masked versions
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal([]byte(tokenJSON), &data); err != nil {
 		return "invalid JSON"
 	}

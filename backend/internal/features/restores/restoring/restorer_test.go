@@ -162,3 +162,7 @@ func Test_MakeRestore_WhenTaskStarts_CacheDeletedImmediately(t *testing.T) {
 	cachedDBAfter := restoreDatabaseCache.Get(restore.ID.String())
 	assert.Nil(t, cachedDBAfter, "Cache should be deleted immediately when task starts")
 }
+
+func stringPtr(s string) *string {
+	return &s
+}

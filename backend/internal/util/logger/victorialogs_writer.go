@@ -59,7 +59,7 @@ func NewVictoriaLogsWriter(url, username, password string) *VictoriaLogsWriter {
 	return writer
 }
 
-func (w *VictoriaLogsWriter) Write(level, message string, attrs map[string]interface{}) {
+func (w *VictoriaLogsWriter) Write(level, message string, attrs map[string]any) {
 	entry := logEntry{
 		Time:    time.Now().UTC().Format(time.RFC3339Nano),
 		Message: message,
@@ -74,6 +74,27 @@ func (w *VictoriaLogsWriter) Write(level, message string, attrs map[string]inter
 		// Channel is full, drop log with warning
 		w.logger.Warn("VictoriaLogs channel buffer full, dropping log entry")
 	}
+}
+
+func (w *VictoriaLogsWriter) Shutdown(timeout time.Duration) {
+	w.once.Do(func() {
+		// Stop accepting new logs
+		w.cancel()
+
+		// Wait for workers to finish with timeout
+		done := make(chan struct{})
+		go func() {
+			w.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			w.logger.Info("VictoriaLogs writer shutdown gracefully")
+		case <-time.After(timeout):
+			w.logger.Warn("VictoriaLogs writer shutdown timeout, some logs may be lost")
+		}
+	})
 }
 
 func (w *VictoriaLogsWriter) worker() {
@@ -179,25 +200,4 @@ func (w *VictoriaLogsWriter) flushBatch(batch []logEntry) {
 	if len(batch) > 0 {
 		w.sendBatch(batch)
 	}
-}
-
-func (w *VictoriaLogsWriter) Shutdown(timeout time.Duration) {
-	w.once.Do(func() {
-		// Stop accepting new logs
-		w.cancel()
-
-		// Wait for workers to finish with timeout
-		done := make(chan struct{})
-		go func() {
-			w.wg.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			w.logger.Info("VictoriaLogs writer shutdown gracefully")
-		case <-time.After(timeout):
-			w.logger.Warn("VictoriaLogs writer shutdown timeout, some logs may be lost")
-		}
-	})
 }

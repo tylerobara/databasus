@@ -353,7 +353,9 @@ func generateSwaggerDocs(log *slog.Logger) {
 		return
 	}
 
-	cmd := exec.Command("swag", "init", "-d", currentDir, "-g", "cmd/main.go", "-o", "swagger")
+	cmd := exec.CommandContext(
+		context.Background(), "swag", "init", "-d", currentDir, "-g", "cmd/main.go", "-o", "swagger",
+	)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -367,7 +369,7 @@ func generateSwaggerDocs(log *slog.Logger) {
 func runMigrations(log *slog.Logger) {
 	log.Info("Running database migrations...")
 
-	cmd := exec.Command("goose", "-dir", "./migrations", "up")
+	cmd := exec.CommandContext(context.Background(), "goose", "-dir", "./migrations", "up")
 	cmd.Env = append(
 		os.Environ(),
 		"GOOSE_DRIVER=postgres",

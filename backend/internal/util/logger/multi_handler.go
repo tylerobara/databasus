@@ -32,7 +32,7 @@ func (h *MultiHandler) Handle(ctx context.Context, record slog.Record) error {
 
 	// Send to VictoriaLogs if configured
 	if h.victoriaLogsWriter != nil {
-		attrs := make(map[string]interface{})
+		attrs := make(map[string]any)
 		record.Attrs(func(a slog.Attr) bool {
 			attrs[a.Key] = a.Value.Any()
 			return true

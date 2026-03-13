@@ -109,7 +109,7 @@ func (s *AzureBlobStorage) SaveFile(
 			return fmt.Errorf("read error: %w", readErr)
 		}
 
-		blockID := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%06d", blockNumber)))
+		blockID := base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%06d", blockNumber))
 
 		_, err := blockBlobClient.StageBlock(
 			ctx,
@@ -337,7 +337,7 @@ func (s *AzureBlobStorage) buildBlobName(fileName string) string {
 	prefix = strings.TrimPrefix(prefix, "/")
 
 	if !strings.HasSuffix(prefix, "/") {
-		prefix = prefix + "/"
+		prefix += "/"
 	}
 
 	return prefix + fileName

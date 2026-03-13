@@ -304,11 +304,12 @@ func (uc *RestorePostgresqlBackupUsecase) restoreViaStdin(
 		_, copyErr := io.Copy(stdinPipe, backupReader)
 		// Close stdin pipe to signal EOF to pg_restore - critical for proper termination
 		closeErr := stdinPipe.Close()
-		if copyErr != nil {
+		switch {
+		case copyErr != nil:
 			copyErrCh <- fmt.Errorf("copy to stdin: %w", copyErr)
-		} else if closeErr != nil {
+		case closeErr != nil:
 			copyErrCh <- fmt.Errorf("close stdin: %w", closeErr)
-		} else {
+		default:
 			copyErrCh <- nil
 		}
 	}()
@@ -764,10 +765,12 @@ func (uc *RestorePostgresqlBackupUsecase) handlePgRestoreError(
 	)
 
 	// Check for specific PostgreSQL error patterns
-	if exitErr, ok := waitErr.(*exec.ExitError); ok {
+	var exitErr *exec.ExitError
+	if errors.As(waitErr, &exitErr) {
 		exitCode := exitErr.ExitCode()
 
-		if exitCode == 1 && strings.TrimSpace(stderrStr) == "" {
+		switch {
+		case exitCode == 1 && strings.TrimSpace(stderrStr) == "":
 			errorMsg = fmt.Sprintf(
 				"%s failed with exit status 1 but provided no error details. "+
 					"This often indicates: "+
@@ -782,45 +785,46 @@ func (uc *RestorePostgresqlBackupUsecase) handlePgRestoreError(
 				pgBin,
 				strings.Join(args, " "),
 			)
-		} else if exitCode == -1073741819 { // 0xC0000005 in decimal
+		case exitCode == -1073741819: // 0xC0000005 in decimal
 			errorMsg = fmt.Sprintf(
 				"%s crashed with access violation (0xC0000005). This may indicate incompatible PostgreSQL version, corrupted installation, or connection issues. stderr: %s",
 				filepath.Base(pgBin),
 				stderrStr,
 			)
-		} else if exitCode == 1 || exitCode == 2 {
+		case exitCode == 1 || exitCode == 2:
 			// Check for common connection and authentication issues
-			if containsIgnoreCase(stderrStr, "pg_hba.conf") {
+			switch {
+			case containsIgnoreCase(stderrStr, "pg_hba.conf"):
 				errorMsg = fmt.Sprintf(
 					"PostgreSQL connection rejected by server configuration (pg_hba.conf). stderr: %s",
 					stderrStr,
 				)
-			} else if containsIgnoreCase(stderrStr, "no password supplied") || containsIgnoreCase(stderrStr, "fe_sendauth") {
+			case containsIgnoreCase(stderrStr, "no password supplied") || containsIgnoreCase(stderrStr, "fe_sendauth"):
 				errorMsg = fmt.Sprintf(
 					"PostgreSQL authentication failed - no password supplied. stderr: %s",
 					stderrStr,
 				)
-			} else if containsIgnoreCase(stderrStr, "ssl") && containsIgnoreCase(stderrStr, "connection") {
+			case containsIgnoreCase(stderrStr, "ssl") && containsIgnoreCase(stderrStr, "connection"):
 				errorMsg = fmt.Sprintf(
 					"PostgreSQL SSL connection failed. stderr: %s",
 					stderrStr,
 				)
-			} else if containsIgnoreCase(stderrStr, "connection") && containsIgnoreCase(stderrStr, "refused") {
+			case containsIgnoreCase(stderrStr, "connection") && containsIgnoreCase(stderrStr, "refused"):
 				errorMsg = fmt.Sprintf(
 					"PostgreSQL connection refused. Check if the server is running and accessible. stderr: %s",
 					stderrStr,
 				)
-			} else if containsIgnoreCase(stderrStr, "authentication") || containsIgnoreCase(stderrStr, "password") {
+			case containsIgnoreCase(stderrStr, "authentication") || containsIgnoreCase(stderrStr, "password"):
 				errorMsg = fmt.Sprintf(
 					"PostgreSQL authentication failed. Check username and password. stderr: %s",
 					stderrStr,
 				)
-			} else if containsIgnoreCase(stderrStr, "timeout") {
+			case containsIgnoreCase(stderrStr, "timeout"):
 				errorMsg = fmt.Sprintf(
 					"PostgreSQL connection timeout. stderr: %s",
 					stderrStr,
 				)
-			} else if containsIgnoreCase(stderrStr, "database") && containsIgnoreCase(stderrStr, "does not exist") {
+			case containsIgnoreCase(stderrStr, "database") && containsIgnoreCase(stderrStr, "does not exist"):
 				backupDbName := "unknown"
 				if database.Postgresql != nil && database.Postgresql.Database != nil {
 					backupDbName = *database.Postgresql.Database

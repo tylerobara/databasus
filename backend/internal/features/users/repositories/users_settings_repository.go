@@ -1,6 +1,8 @@
 package users_repositories
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -14,7 +16,7 @@ func (r *UsersSettingsRepository) GetSettings() (*user_models.UsersSettings, err
 	var settings user_models.UsersSettings
 
 	if err := storage.GetDb().First(&settings).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Create default settings if none exist
 			defaultSettings := &user_models.UsersSettings{
 				ID:                                uuid.New(),

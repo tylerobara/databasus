@@ -214,39 +214,6 @@ func (s *BackupConfigService) CreateDisabledBackupConfig(databaseID uuid.UUID) e
 	return s.initializeDefaultConfig(databaseID)
 }
 
-func (s *BackupConfigService) initializeDefaultConfig(
-	databaseID uuid.UUID,
-) error {
-	plan, err := s.databasePlanService.GetDatabasePlan(databaseID)
-	if err != nil {
-		return err
-	}
-
-	timeOfDay := "04:00"
-
-	_, err = s.backupConfigRepository.Save(&BackupConfig{
-		DatabaseID:            databaseID,
-		IsBackupsEnabled:      false,
-		RetentionPolicyType:   RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   plan.MaxStoragePeriod,
-		MaxBackupSizeMB:       plan.MaxBackupSizeMB,
-		MaxBackupsTotalSizeMB: plan.MaxBackupsTotalSizeMB,
-		BackupInterval: &intervals.Interval{
-			Interval:  intervals.IntervalDaily,
-			TimeOfDay: &timeOfDay,
-		},
-		SendNotificationsOn: []BackupNotificationType{
-			NotificationBackupFailed,
-			NotificationBackupSuccess,
-		},
-		IsRetryIfFailed:     true,
-		MaxFailedTriesCount: 3,
-		Encryption:          BackupEncryptionNone,
-	})
-
-	return err
-}
-
 func (s *BackupConfigService) TransferDatabaseToWorkspace(
 	user *users_models.User,
 	databaseID uuid.UUID,
@@ -290,7 +257,8 @@ func (s *BackupConfigService) TransferDatabaseToWorkspace(
 		s.transferNotifiers(user, database, request.TargetWorkspaceID)
 	}
 
-	if request.IsTransferWithStorage {
+	switch {
+	case request.IsTransferWithStorage:
 		if backupConfig.StorageID == nil {
 			return ErrDatabaseHasNoStorage
 		}
@@ -315,7 +283,7 @@ func (s *BackupConfigService) TransferDatabaseToWorkspace(
 		if err != nil {
 			return err
 		}
-	} else if request.TargetStorageID != nil {
+	case request.TargetStorageID != nil:
 		targetStorage, err := s.storageService.GetStorageByID(*request.TargetStorageID)
 		if err != nil {
 			return err
@@ -332,7 +300,7 @@ func (s *BackupConfigService) TransferDatabaseToWorkspace(
 		if err != nil {
 			return err
 		}
-	} else {
+	default:
 		return ErrTargetStorageNotSpecified
 	}
 
@@ -349,6 +317,39 @@ func (s *BackupConfigService) TransferDatabaseToWorkspace(
 	}
 
 	return nil
+}
+
+func (s *BackupConfigService) initializeDefaultConfig(
+	databaseID uuid.UUID,
+) error {
+	plan, err := s.databasePlanService.GetDatabasePlan(databaseID)
+	if err != nil {
+		return err
+	}
+
+	timeOfDay := "04:00"
+
+	_, err = s.backupConfigRepository.Save(&BackupConfig{
+		DatabaseID:            databaseID,
+		IsBackupsEnabled:      false,
+		RetentionPolicyType:   RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod:   plan.MaxStoragePeriod,
+		MaxBackupSizeMB:       plan.MaxBackupSizeMB,
+		MaxBackupsTotalSizeMB: plan.MaxBackupsTotalSizeMB,
+		BackupInterval: &intervals.Interval{
+			Interval:  intervals.IntervalDaily,
+			TimeOfDay: &timeOfDay,
+		},
+		SendNotificationsOn: []BackupNotificationType{
+			NotificationBackupFailed,
+			NotificationBackupSuccess,
+		},
+		IsRetryIfFailed:     true,
+		MaxFailedTriesCount: 3,
+		Encryption:          BackupEncryptionNone,
+	})
+
+	return err
 }
 
 func (s *BackupConfigService) transferNotifiers(

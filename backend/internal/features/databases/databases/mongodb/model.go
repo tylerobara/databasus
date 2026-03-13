@@ -451,6 +451,48 @@ func (m *MongodbDatabase) CreateReadOnlyUser(
 	return "", "", errors.New("failed to generate unique username after 3 attempts")
 }
 
+// BuildMongodumpURI builds a URI suitable for mongodump (without database in path)
+func (m *MongodbDatabase) BuildMongodumpURI(password string) string {
+	authDB := m.AuthDatabase
+	if authDB == "" {
+		authDB = "admin"
+	}
+
+	extraParams := ""
+	if m.IsHttps {
+		extraParams += "&tls=true&tlsInsecure=true"
+	}
+	if m.IsDirectConnection {
+		extraParams += "&directConnection=true"
+	}
+
+	if m.IsSrv {
+		return fmt.Sprintf(
+			"mongodb+srv://%s:%s@%s/?authSource=%s&connectTimeoutMS=15000%s",
+			url.QueryEscape(m.Username),
+			url.QueryEscape(password),
+			m.Host,
+			authDB,
+			extraParams,
+		)
+	}
+
+	port := 27017
+	if m.Port != nil {
+		port = *m.Port
+	}
+
+	return fmt.Sprintf(
+		"mongodb://%s:%s@%s:%d/?authSource=%s&connectTimeoutMS=15000%s",
+		url.QueryEscape(m.Username),
+		url.QueryEscape(password),
+		m.Host,
+		port,
+		authDB,
+		extraParams,
+	)
+}
+
 // buildConnectionURI builds a MongoDB connection URI
 func (m *MongodbDatabase) buildConnectionURI(password string) string {
 	authDB := m.AuthDatabase
@@ -490,48 +532,6 @@ func (m *MongodbDatabase) buildConnectionURI(password string) string {
 		m.Host,
 		port,
 		m.Database,
-		authDB,
-		extraParams,
-	)
-}
-
-// BuildMongodumpURI builds a URI suitable for mongodump (without database in path)
-func (m *MongodbDatabase) BuildMongodumpURI(password string) string {
-	authDB := m.AuthDatabase
-	if authDB == "" {
-		authDB = "admin"
-	}
-
-	extraParams := ""
-	if m.IsHttps {
-		extraParams += "&tls=true&tlsInsecure=true"
-	}
-	if m.IsDirectConnection {
-		extraParams += "&directConnection=true"
-	}
-
-	if m.IsSrv {
-		return fmt.Sprintf(
-			"mongodb+srv://%s:%s@%s/?authSource=%s&connectTimeoutMS=15000%s",
-			url.QueryEscape(m.Username),
-			url.QueryEscape(password),
-			m.Host,
-			authDB,
-			extraParams,
-		)
-	}
-
-	port := 27017
-	if m.Port != nil {
-		port = *m.Port
-	}
-
-	return fmt.Sprintf(
-		"mongodb://%s:%s@%s:%d/?authSource=%s&connectTimeoutMS=15000%s",
-		url.QueryEscape(m.Username),
-		url.QueryEscape(password),
-		m.Host,
-		port,
 		authDB,
 		extraParams,
 	)

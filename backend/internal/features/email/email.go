@@ -1,6 +1,7 @@
 package email
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log/slog"
@@ -114,7 +115,7 @@ func (s *EmailSMTPSender) createImplicitTLSClient() (*smtp.Client, func(), error
 	tlsConfig := &tls.Config{ServerName: s.smtpHost}
 	dialer := &net.Dialer{Timeout: DefaultTimeout}
 
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	conn, err := (&tls.Dialer{NetDialer: dialer, Config: tlsConfig}).DialContext(context.Background(), "tcp", addr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to SMTP server: %w", err)
 	}

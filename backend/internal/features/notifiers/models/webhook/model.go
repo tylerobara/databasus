@@ -2,6 +2,7 @@ package webhook_notifier
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -146,7 +147,7 @@ func (t *WebhookNotifier) sendGET(webhookURL, heading, message string, logger *s
 		url.QueryEscape(message),
 	)
 
-	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create GET request: %w", err)
 	}
@@ -180,7 +181,7 @@ func (t *WebhookNotifier) sendGET(webhookURL, heading, message string, logger *s
 func (t *WebhookNotifier) sendPOST(webhookURL, heading, message string, logger *slog.Logger) error {
 	body := t.buildRequestBody(heading, message)
 
-	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, webhookURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create POST request: %w", err)
 	}

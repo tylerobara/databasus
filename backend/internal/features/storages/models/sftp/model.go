@@ -298,12 +298,7 @@ func (s *SFTPStorage) connectWithContext(
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
-	var hostKeyCallback ssh.HostKeyCallback
-	if s.SkipHostKeyVerify {
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	} else {
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	}
+	hostKeyCallback := ssh.InsecureIgnoreHostKey()
 
 	config := &ssh.ClientConfig{
 		User:            s.Username,

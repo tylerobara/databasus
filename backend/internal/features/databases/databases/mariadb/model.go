@@ -391,7 +391,7 @@ func (m *MariadbDatabase) HasPrivilege(priv string) bool {
 }
 
 func HasPrivilege(privileges, priv string) bool {
-	for _, p := range strings.Split(privileges, ",") {
+	for p := range strings.SplitSeq(privileges, ",") {
 		if strings.TrimSpace(p) == priv {
 			return true
 		}

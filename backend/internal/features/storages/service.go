@@ -364,10 +364,8 @@ func (s *StorageService) TransferStorageToWorkspace(
 				return ErrStorageHasOtherAttachedDatabasesCannotTransfer
 			}
 		}
-	} else {
-		if len(attachedDatabasesIDs) > 0 {
-			return ErrStorageHasAttachedDatabasesCannotTransfer
-		}
+	} else if len(attachedDatabasesIDs) > 0 {
+		return ErrStorageHasAttachedDatabasesCannotTransfer
 	}
 
 	sourceWorkspaceID := existingStorage.WorkspaceID

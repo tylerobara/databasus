@@ -595,8 +595,8 @@ func (uc *CreatePostgresqlBackupUsecase) buildPgDumpErrorMessage(
 	stderrStr := string(stderrOutput)
 	errorMsg := fmt.Sprintf("%s failed: %v – stderr: %s", filepath.Base(pgBin), waitErr, stderrStr)
 
-	exitErr, ok := waitErr.(*exec.ExitError)
-	if !ok {
+	var exitErr *exec.ExitError
+	if !errors.As(waitErr, &exitErr) {
 		return errors.New(errorMsg)
 	}
 

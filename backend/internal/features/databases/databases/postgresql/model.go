@@ -1153,8 +1153,8 @@ func isSupabaseConnection(host, username string) bool {
 }
 
 func extractSupabaseProjectID(username string) string {
-	if idx := strings.Index(username, "."); idx != -1 {
-		return username[idx+1:]
+	if _, after, found := strings.Cut(username, "."); found {
+		return after
 	}
 	return ""
 }

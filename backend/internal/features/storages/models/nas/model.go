@@ -356,7 +356,7 @@ func (n *NASStorage) createConnectionWithContext(ctx context.Context) (net.Conn,
 			ServerName:         n.Host,
 			InsecureSkipVerify: false,
 		}
-		conn, err := tls.DialWithDialer(dialer, "tcp", address, tlsConfig)
+		conn, err := (&tls.Dialer{NetDialer: dialer, Config: tlsConfig}).DialContext(ctx, "tcp", address)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create SSL connection to %s: %w", address, err)
 		}

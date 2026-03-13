@@ -2,6 +2,7 @@ package slack_notifier
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,7 +87,8 @@ func (s *SlackNotifier) Send(
 	for {
 		attempts++
 
-		req, err := http.NewRequest(
+		req, err := http.NewRequestWithContext(
+			context.Background(),
 			"POST",
 			"https://slack.com/api/chat.postMessage",
 			bytes.NewReader(payload),
@@ -136,7 +138,7 @@ func (s *SlackNotifier) Send(
 
 		if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 			raw, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("decode response: %v – raw: %s", err, raw)
+			return fmt.Errorf("decode response: %w – raw: %s", err, raw)
 		}
 
 		if !respBody.OK {

@@ -548,8 +548,8 @@ func (uc *CreateMariadbBackupUsecase) buildMariadbDumpErrorMessage(
 		stderrStr,
 	)
 
-	exitErr, ok := waitErr.(*exec.ExitError)
-	if !ok {
+	var exitErr *exec.ExitError
+	if !errors.As(waitErr, &exitErr) {
 		return errors.New(errorMsg)
 	}
 

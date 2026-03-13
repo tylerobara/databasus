@@ -1,7 +1,6 @@
 package features
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -60,11 +59,9 @@ func Test_SetupDependencies_ConcurrentCalls_Safe(t *testing.T) {
 
 	// Call SetupDependencies concurrently from 10 goroutines
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			audit_logs.SetupDependencies()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -73,8 +70,7 @@ func Test_SetupDependencies_ConcurrentCalls_Safe(t *testing.T) {
 
 // Test_BackgroundService_Run_CalledTwice_Panics verifies Run() panics on duplicate calls
 func Test_BackgroundService_Run_CalledTwice_Panics(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create a test background service
 	backgroundService := audit_logs.GetAuditLogBackgroundService()
@@ -107,8 +103,7 @@ func Test_BackgroundService_Run_CalledTwice_Panics(t *testing.T) {
 
 // Test_BackupsScheduler_Run_CalledTwice_Panics verifies scheduler panics on duplicate calls
 func Test_BackupsScheduler_Run_CalledTwice_Panics(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	scheduler := backuping.GetBackupsScheduler()
 

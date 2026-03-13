@@ -199,6 +199,54 @@ func (s *RestoreService) RestoreBackupWithAuth(
 	return nil
 }
 
+func (s *RestoreService) CancelRestore(
+	user *users_models.User,
+	restoreID uuid.UUID,
+) error {
+	restore, err := s.restoreRepository.FindByID(restoreID)
+	if err != nil {
+		return err
+	}
+
+	backup, err := s.backupService.GetBackup(restore.BackupID)
+	if err != nil {
+		return err
+	}
+
+	database, err := s.databaseService.GetDatabaseByID(backup.DatabaseID)
+	if err != nil {
+		return err
+	}
+
+	if database.WorkspaceID == nil {
+		return errors.New("cannot cancel restore for database without workspace")
+	}
+
+	canManage, err := s.workspaceService.CanUserManageDBs(*database.WorkspaceID, user)
+	if err != nil {
+		return err
+	}
+	if !canManage {
+		return errors.New("insufficient permissions to cancel restore for this database")
+	}
+
+	if restore.Status != restores_core.RestoreStatusInProgress {
+		return errors.New("restore is not in progress")
+	}
+
+	if err := s.taskCancelManager.CancelTask(restoreID); err != nil {
+		return err
+	}
+
+	s.auditLogService.WriteAuditLog(
+		fmt.Sprintf("Restore cancelled for database: %s", database.Name),
+		&user.ID,
+		database.WorkspaceID,
+	)
+
+	return nil
+}
+
 func (s *RestoreService) validateVersionCompatibility(
 	backupDatabase *databases.Database,
 	requestDTO restores_core.RestoreBackupRequest,
@@ -295,6 +343,7 @@ func (s *RestoreService) validateVersionCompatibility(
 				`For example, you can restore MongoDB 6.0 backup to MongoDB 6.0, 7.0 or higher. But cannot restore to 5.0`)
 		}
 	}
+
 	return nil
 }
 
@@ -365,54 +414,6 @@ func (s *RestoreService) validateNoParallelRestores(databaseID uuid.UUID) error 
 			"another restore is already in progress for this database. Please wait for it to complete or cancel it before starting a new restore",
 		)
 	}
-
-	return nil
-}
-
-func (s *RestoreService) CancelRestore(
-	user *users_models.User,
-	restoreID uuid.UUID,
-) error {
-	restore, err := s.restoreRepository.FindByID(restoreID)
-	if err != nil {
-		return err
-	}
-
-	backup, err := s.backupService.GetBackup(restore.BackupID)
-	if err != nil {
-		return err
-	}
-
-	database, err := s.databaseService.GetDatabaseByID(backup.DatabaseID)
-	if err != nil {
-		return err
-	}
-
-	if database.WorkspaceID == nil {
-		return errors.New("cannot cancel restore for database without workspace")
-	}
-
-	canManage, err := s.workspaceService.CanUserManageDBs(*database.WorkspaceID, user)
-	if err != nil {
-		return err
-	}
-	if !canManage {
-		return errors.New("insufficient permissions to cancel restore for this database")
-	}
-
-	if restore.Status != restores_core.RestoreStatusInProgress {
-		return errors.New("restore is not in progress")
-	}
-
-	if err := s.taskCancelManager.CancelTask(restoreID); err != nil {
-		return err
-	}
-
-	s.auditLogService.WriteAuditLog(
-		fmt.Sprintf("Restore cancelled for database: %s", database.Name),
-		&user.ID,
-		database.WorkspaceID,
-	)
 
 	return nil
 }

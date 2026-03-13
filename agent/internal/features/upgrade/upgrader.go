@@ -1,6 +1,7 @@
 package upgrade
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -74,9 +75,17 @@ func CheckAndUpdate(databasusHost, currentVersion string, isDev bool, log Logger
 }
 
 func fetchServerVersion(host string, log Logger) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Get(host + "/api/v1/system/version")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, host+"/api/v1/system/version", nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Warn("Could not reach server for update check, continuing", "error", err)
 		return "", err
@@ -104,7 +113,15 @@ func fetchServerVersion(host string, log Logger) (string, error) {
 func downloadBinary(host, destPath string) error {
 	url := fmt.Sprintf("%s/api/v1/system/agent?arch=%s", host, runtime.GOARCH)
 
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -126,7 +143,7 @@ func downloadBinary(host, destPath string) error {
 }
 
 func verifyBinary(binaryPath, expectedVersion string) error {
-	cmd := exec.Command(binaryPath, "version")
+	cmd := exec.CommandContext(context.Background(), binaryPath, "version")
 
 	output, err := cmd.Output()
 	if err != nil {

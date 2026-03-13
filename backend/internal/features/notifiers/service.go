@@ -343,10 +343,8 @@ func (s *NotifierService) TransferNotifierToWorkspace(
 				return ErrNotifierHasOtherAttachedDatabasesCannotTransfer
 			}
 		}
-	} else {
-		if len(attachedDatabasesIDs) > 0 {
-			return ErrNotifierHasAttachedDatabasesCannotTransfer
-		}
+	} else if len(attachedDatabasesIDs) > 0 {
+		return ErrNotifierHasAttachedDatabasesCannotTransfer
 	}
 
 	sourceWorkspaceID := existingNotifier.WorkspaceID

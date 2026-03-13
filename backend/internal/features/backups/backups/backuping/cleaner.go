@@ -446,22 +446,24 @@ func buildGFSKeepSet(
 	}
 
 	dailyCutoff := rawDailyCutoff
-	if weeks > 0 {
+	switch {
+	case weeks > 0:
 		dailyCutoff = laterOf(dailyCutoff, weeklyCutoff)
-	} else if months > 0 {
+	case months > 0:
 		dailyCutoff = laterOf(dailyCutoff, monthlyCutoff)
-	} else if years > 0 {
+	case years > 0:
 		dailyCutoff = laterOf(dailyCutoff, yearlyCutoff)
 	}
 
 	hourlyCutoff := rawHourlyCutoff
-	if days > 0 {
+	switch {
+	case days > 0:
 		hourlyCutoff = laterOf(hourlyCutoff, dailyCutoff)
-	} else if weeks > 0 {
+	case weeks > 0:
 		hourlyCutoff = laterOf(hourlyCutoff, weeklyCutoff)
-	} else if months > 0 {
+	case months > 0:
 		hourlyCutoff = laterOf(hourlyCutoff, monthlyCutoff)
-	} else if years > 0 {
+	case years > 0:
 		hourlyCutoff = laterOf(hourlyCutoff, yearlyCutoff)
 	}
 

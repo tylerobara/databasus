@@ -207,7 +207,7 @@ func (s *S3Storage) GetFile(
 	// Check if the file actually exists by reading the first byte
 	buf := make([]byte, 1)
 	_, readErr := object.Read(buf)
-	if readErr != nil && readErr != io.EOF {
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
 		_ = object.Close()
 		return nil, fmt.Errorf("file does not exist in S3: %w", readErr)
 	}
@@ -372,7 +372,7 @@ func (s *S3Storage) buildObjectKey(fileName string) string {
 	prefix = strings.TrimPrefix(prefix, "/")
 
 	if !strings.HasSuffix(prefix, "/") {
-		prefix = prefix + "/"
+		prefix += "/"
 	}
 
 	return prefix + fileName
@@ -428,11 +428,11 @@ func (s *S3Storage) getClientParams(
 	endpoint = s.S3Endpoint
 	useSSL = true
 
-	if strings.HasPrefix(endpoint, "http://") {
+	if after, ok := strings.CutPrefix(endpoint, "http://"); ok {
 		useSSL = false
-		endpoint = strings.TrimPrefix(endpoint, "http://")
-	} else if strings.HasPrefix(endpoint, "https://") {
-		endpoint = strings.TrimPrefix(endpoint, "https://")
+		endpoint = after
+	} else if after, ok := strings.CutPrefix(endpoint, "https://"); ok {
+		endpoint = after
 	}
 
 	if endpoint == "" {

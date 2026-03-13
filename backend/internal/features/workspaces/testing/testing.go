@@ -2,6 +2,7 @@ package workspaces_testing
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -433,7 +434,7 @@ func MakeAPIRequest(
 		requestBody = bytes.NewBuffer(nil)
 	}
 
-	req, err := http.NewRequest(method, url, requestBody)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, requestBody)
 	if err != nil {
 		panic(err)
 	}

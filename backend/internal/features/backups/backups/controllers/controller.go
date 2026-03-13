@@ -2,6 +2,7 @@ package backups_controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -198,7 +199,7 @@ func (c *BackupController) GenerateDownloadToken(ctx *gin.Context) {
 
 	response, err := c.backupService.GenerateDownloadToken(user, id)
 	if err != nil {
-		if err == backups_download.ErrDownloadAlreadyInProgress {
+		if errors.Is(err, backups_download.ErrDownloadAlreadyInProgress) {
 			ctx.JSON(
 				http.StatusConflict,
 				gin.H{
@@ -249,7 +250,7 @@ func (c *BackupController) GetFile(ctx *gin.Context) {
 
 	downloadToken, rateLimiter, err := c.backupService.ValidateDownloadToken(token)
 	if err != nil {
-		if err == backups_download.ErrDownloadAlreadyInProgress {
+		if errors.Is(err, backups_download.ErrDownloadAlreadyInProgress) {
 			ctx.JSON(
 				http.StatusConflict,
 				gin.H{

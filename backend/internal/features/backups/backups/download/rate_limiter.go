@@ -66,9 +66,7 @@ func (rl *RateLimiter) Wait(bytes int64) {
 		tokensNeeded := float64(bytes) - rl.availableTokens
 		waitTime := time.Duration(tokensNeeded/float64(rl.bytesPerSecond)*1000) * time.Millisecond
 
-		if waitTime < time.Millisecond {
-			waitTime = time.Millisecond
-		}
+		waitTime = max(waitTime, time.Millisecond)
 
 		rl.mu.Unlock()
 		time.Sleep(waitTime)

@@ -1,6 +1,7 @@
 package users_repositories
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,7 +32,7 @@ func (r *UserRepository) GetUserByEmail(email string) (*users_models.User, error
 	var user users_models.User
 
 	if err := storage.GetDb().Where("email = ?", email).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 
@@ -179,7 +180,7 @@ func (r *UserRepository) UpdateUserInfo(userID uuid.UUID, name, email *string) e
 func (r *UserRepository) GetUserByGitHubOAuthID(githubID string) (*users_models.User, error) {
 	var user users_models.User
 	err := storage.GetDb().Where("github_oauth_id = ?", githubID).First(&user).Error
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -191,7 +192,7 @@ func (r *UserRepository) GetUserByGitHubOAuthID(githubID string) (*users_models.
 func (r *UserRepository) GetUserByGoogleOAuthID(googleID string) (*users_models.User, error) {
 	var user users_models.User
 	err := storage.GetDb().Where("google_oauth_id = ?", googleID).First(&user).Error
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
