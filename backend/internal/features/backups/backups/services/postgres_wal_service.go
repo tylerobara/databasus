@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	backups_dto "databasus-backend/internal/features/backups/backups/dto"
 	backup_encryption "databasus-backend/internal/features/backups/backups/encryption"
@@ -16,8 +18,6 @@ import (
 	encryption_secrets "databasus-backend/internal/features/encryption/secrets"
 	util_encryption "databasus-backend/internal/util/encryption"
 	util_wal "databasus-backend/internal/util/wal"
-
-	"github.com/google/uuid"
 )
 
 // PostgreWalBackupService handles WAL segment and basebackup uploads from the databasus-cli agent.
@@ -609,5 +609,5 @@ func (cr *countingReader) Read(p []byte) (n int, err error) {
 	n, err = cr.r.Read(p)
 	cr.n += int64(n)
 
-	return
+	return n, err
 }

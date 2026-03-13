@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	cache_utils "databasus-backend/internal/util/cache"
-	"databasus-backend/internal/util/logger"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	cache_utils "databasus-backend/internal/util/cache"
+	"databasus-backend/internal/util/logger"
 )
 
 func Test_HearthbeatNodeInRegistry_RegistersNodeWithTTL(t *testing.T) {
@@ -905,7 +905,7 @@ func Test_SubscribeForRestoresCompletions_ReceivesCompletedRestores(t *testing.T
 
 	receivedRestoreID := make(chan uuid.UUID, 1)
 	receivedNodeID := make(chan uuid.UUID, 1)
-	handler := func(nodeID uuid.UUID, restoreID uuid.UUID) {
+	handler := func(nodeID, restoreID uuid.UUID) {
 		receivedNodeID <- nodeID
 		receivedRestoreID <- restoreID
 	}
@@ -942,7 +942,7 @@ func Test_SubscribeForRestoresCompletions_ParsesJsonCorrectly(t *testing.T) {
 	defer registry.UnsubscribeForRestoresCompletions()
 
 	receivedRestores := make(chan uuid.UUID, 2)
-	handler := func(nodeID uuid.UUID, restoreID uuid.UUID) {
+	handler := func(nodeID, restoreID uuid.UUID) {
 		receivedRestores <- restoreID
 	}
 
@@ -971,7 +971,7 @@ func Test_SubscribeForRestoresCompletions_HandlesInvalidJson(t *testing.T) {
 	defer registry.UnsubscribeForRestoresCompletions()
 
 	receivedRestoreID := make(chan uuid.UUID, 1)
-	handler := func(nodeID uuid.UUID, restoreID uuid.UUID) {
+	handler := func(nodeID, restoreID uuid.UUID) {
 		receivedRestoreID <- restoreID
 	}
 
@@ -999,7 +999,7 @@ func Test_UnsubscribeForRestoresCompletions_StopsReceivingMessages(t *testing.T)
 	restoreID2 := uuid.New()
 
 	receivedRestoreID := make(chan uuid.UUID, 2)
-	handler := func(nodeID uuid.UUID, restoreID uuid.UUID) {
+	handler := func(nodeID, restoreID uuid.UUID) {
 		receivedRestoreID <- restoreID
 	}
 
@@ -1034,7 +1034,7 @@ func Test_SubscribeForRestoresCompletions_WhenAlreadySubscribed_ReturnsError(t *
 	registry := createTestRegistry()
 	defer registry.UnsubscribeForRestoresCompletions()
 
-	handler := func(nodeID uuid.UUID, restoreID uuid.UUID) {}
+	handler := func(nodeID, restoreID uuid.UUID) {}
 
 	err := registry.SubscribeForRestoresCompletions(handler)
 	assert.NoError(t, err)
@@ -1066,9 +1066,9 @@ func Test_MultipleSubscribers_EachReceivesCompletionMessages(t *testing.T) {
 	receivedRestores2 := make(chan uuid.UUID, 3)
 	receivedRestores3 := make(chan uuid.UUID, 3)
 
-	handler1 := func(nodeID uuid.UUID, restoreID uuid.UUID) { receivedRestores1 <- restoreID }
-	handler2 := func(nodeID uuid.UUID, restoreID uuid.UUID) { receivedRestores2 <- restoreID }
-	handler3 := func(nodeID uuid.UUID, restoreID uuid.UUID) { receivedRestores3 <- restoreID }
+	handler1 := func(nodeID, restoreID uuid.UUID) { receivedRestores1 <- restoreID }
+	handler2 := func(nodeID, restoreID uuid.UUID) { receivedRestores2 <- restoreID }
+	handler3 := func(nodeID, restoreID uuid.UUID) { receivedRestores3 <- restoreID }
 
 	err := registry1.SubscribeForRestoresCompletions(handler1)
 	assert.NoError(t, err)

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"databasus-backend/internal/config"
 	user_models "databasus-backend/internal/features/users/models"
 	"databasus-backend/internal/storage"
-
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type SecretKeyService struct {
@@ -33,7 +33,7 @@ func (s *SecretKeyService) MigrateKeyFromDbToFileIfExist() error {
 	}
 
 	secretKeyPath := config.GetEnv().SecretKeyPath
-	if err := os.WriteFile(secretKeyPath, []byte(secretKey.Secret), 0600); err != nil {
+	if err := os.WriteFile(secretKeyPath, []byte(secretKey.Secret), 0o600); err != nil {
 		return fmt.Errorf("failed to write secret key to file: %w", err)
 	}
 
@@ -54,7 +54,7 @@ func (s *SecretKeyService) GetSecretKey() (string, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			newKey := s.generateNewSecretKey()
-			if err := os.WriteFile(secretKeyPath, []byte(newKey), 0600); err != nil {
+			if err := os.WriteFile(secretKeyPath, []byte(newKey), 0o600); err != nil {
 				return "", fmt.Errorf("failed to write new secret key: %w", err)
 			}
 			s.cachedKey = &newKey

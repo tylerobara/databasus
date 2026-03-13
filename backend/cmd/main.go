@@ -12,6 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
+	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
 	"databasus-backend/internal/config"
 	"databasus-backend/internal/features/audit_logs"
 	"databasus-backend/internal/features/backups/backups/backuping"
@@ -41,12 +47,6 @@ import (
 	files_utils "databasus-backend/internal/util/files"
 	"databasus-backend/internal/util/logger"
 	_ "databasus-backend/swagger" // swagger docs
-
-	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/gzip"
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title Databasus Backend API
@@ -83,7 +83,6 @@ func main() {
 		config.GetEnv().TempFolder,
 		config.GetEnv().DataFolder,
 	})
-
 	if err != nil {
 		log.Error("Failed to ensure directories", "error", err)
 		os.Exit(1)
@@ -150,7 +149,7 @@ func handlePasswordReset(log *slog.Logger) {
 	resetPassword(*email, *newPassword, log)
 }
 
-func resetPassword(email string, newPassword string, log *slog.Logger) {
+func resetPassword(email, newPassword string, log *slog.Logger) {
 	log.Info("Resetting password...")
 
 	userService := users_services.GetUserService()

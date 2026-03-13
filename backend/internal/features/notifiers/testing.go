@@ -1,9 +1,9 @@
 package notifiers
 
 import (
-	webhook_notifier "databasus-backend/internal/features/notifiers/models/webhook"
-
 	"github.com/google/uuid"
+
+	webhook_notifier "databasus-backend/internal/features/notifiers/models/webhook"
 )
 
 func CreateTestNotifier(workspaceID uuid.UUID) *Notifier {

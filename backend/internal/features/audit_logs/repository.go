@@ -1,10 +1,11 @@
 package audit_logs
 
 import (
-	"databasus-backend/internal/storage"
 	"time"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/storage"
 )
 
 type AuditLogRepository struct{}
@@ -21,7 +22,7 @@ func (r *AuditLogRepository) GetGlobal(
 	limit, offset int,
 	beforeDate *time.Time,
 ) ([]*AuditLogDTO, error) {
-	var auditLogs = make([]*AuditLogDTO, 0)
+	auditLogs := make([]*AuditLogDTO, 0)
 
 	sql := `
 		SELECT 
@@ -57,7 +58,7 @@ func (r *AuditLogRepository) GetByUser(
 	limit, offset int,
 	beforeDate *time.Time,
 ) ([]*AuditLogDTO, error) {
-	var auditLogs = make([]*AuditLogDTO, 0)
+	auditLogs := make([]*AuditLogDTO, 0)
 
 	sql := `
 		SELECT 
@@ -94,7 +95,7 @@ func (r *AuditLogRepository) GetByWorkspace(
 	limit, offset int,
 	beforeDate *time.Time,
 ) ([]*AuditLogDTO, error) {
-	var auditLogs = make([]*AuditLogDTO, 0)
+	auditLogs := make([]*AuditLogDTO, 0)
 
 	sql := `
 		SELECT 

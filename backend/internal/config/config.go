@@ -1,9 +1,6 @@
 package config
 
 import (
-	env_utils "databasus-backend/internal/util/env"
-	"databasus-backend/internal/util/logger"
-	"databasus-backend/internal/util/tools"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +8,10 @@ import (
 
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
+
+	env_utils "databasus-backend/internal/util/env"
+	"databasus-backend/internal/util/logger"
+	"databasus-backend/internal/util/tools"
 )
 
 var log = logger.GetLogger()

@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"sync"
 
-	"databasus-backend/internal/util/logger"
-
 	"github.com/valkey-io/valkey-go"
+
+	"databasus-backend/internal/util/logger"
 )
 
 type PubSubManager struct {
@@ -46,7 +46,7 @@ func (m *PubSubManager) Subscribe(
 	return nil
 }
 
-func (m *PubSubManager) Publish(ctx context.Context, channel string, message string) error {
+func (m *PubSubManager) Publish(ctx context.Context, channel, message string) error {
 	cmd := m.client.B().Publish().Channel(channel).Message(message).Build()
 	result := m.client.Do(ctx, cmd)
 

@@ -11,12 +11,14 @@ import (
 	"databasus-backend/internal/util/logger"
 )
 
-var healthcheckAttemptRepository = &HealthcheckAttemptRepository{}
-var healthcheckAttemptService = &HealthcheckAttemptService{
-	healthcheckAttemptRepository,
-	databases.GetDatabaseService(),
-	workspaces_services.GetWorkspaceService(),
-}
+var (
+	healthcheckAttemptRepository = &HealthcheckAttemptRepository{}
+	healthcheckAttemptService    = &HealthcheckAttemptService{
+		healthcheckAttemptRepository,
+		databases.GetDatabaseService(),
+		workspaces_services.GetWorkspaceService(),
+	}
+)
 
 var checkDatabaseHealthUseCase = &CheckDatabaseHealthUseCase{
 	healthcheckAttemptRepository,
@@ -31,6 +33,7 @@ var healthcheckAttemptBackgroundService = &HealthcheckAttemptBackgroundService{
 	runOnce:                    sync.Once{},
 	hasRun:                     atomic.Bool{},
 }
+
 var healthcheckAttemptController = &HealthcheckAttemptController{
 	healthcheckAttemptService,
 }

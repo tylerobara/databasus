@@ -265,7 +265,7 @@ func (s *RestoresScheduler) calculateLeastBusyNode() (*uuid.UUID, error) {
 	return &bestNode.ID, nil
 }
 
-func (s *RestoresScheduler) onRestoreCompleted(nodeID uuid.UUID, restoreID uuid.UUID) {
+func (s *RestoresScheduler) onRestoreCompleted(nodeID, restoreID uuid.UUID) {
 	// Verify this task is actually a restore (registry contains multiple task types)
 	_, err := s.restoreRepository.FindByID(restoreID)
 	if err != nil {

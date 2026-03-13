@@ -194,7 +194,6 @@ func (s *UserService) GetUserFromToken(token string) (*users_models.User, error)
 		}
 		return []byte(secretKey), nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
@@ -275,7 +274,6 @@ func (s *UserService) CreateInitialAdmin() error {
 
 func (s *UserService) IsRootAdminHasPassword() (bool, error) {
 	admin, err := s.userRepository.GetUserByEmail("admin")
-
 	if err != nil {
 		return false, fmt.Errorf("failed to get admin user: %w", err)
 	}
@@ -321,7 +319,7 @@ func (s *UserService) SetRootAdminPassword(password string) error {
 	return nil
 }
 
-func (s *UserService) ChangeUserPasswordByEmail(email string, newPassword string) error {
+func (s *UserService) ChangeUserPasswordByEmail(email, newPassword string) error {
 	user, err := s.userRepository.GetUserByEmail(email)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)

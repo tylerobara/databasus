@@ -3,17 +3,6 @@ package storages
 import (
 	"bytes"
 	"context"
-	"databasus-backend/internal/config"
-	azure_blob_storage "databasus-backend/internal/features/storages/models/azure_blob"
-	ftp_storage "databasus-backend/internal/features/storages/models/ftp"
-	google_drive_storage "databasus-backend/internal/features/storages/models/google_drive"
-	local_storage "databasus-backend/internal/features/storages/models/local"
-	nas_storage "databasus-backend/internal/features/storages/models/nas"
-	rclone_storage "databasus-backend/internal/features/storages/models/rclone"
-	s3_storage "databasus-backend/internal/features/storages/models/s3"
-	sftp_storage "databasus-backend/internal/features/storages/models/sftp"
-	"databasus-backend/internal/util/encryption"
-	"databasus-backend/internal/util/logger"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +17,18 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"databasus-backend/internal/config"
+	azure_blob_storage "databasus-backend/internal/features/storages/models/azure_blob"
+	ftp_storage "databasus-backend/internal/features/storages/models/ftp"
+	google_drive_storage "databasus-backend/internal/features/storages/models/google_drive"
+	local_storage "databasus-backend/internal/features/storages/models/local"
+	nas_storage "databasus-backend/internal/features/storages/models/nas"
+	rclone_storage "databasus-backend/internal/features/storages/models/rclone"
+	s3_storage "databasus-backend/internal/features/storages/models/s3"
+	sftp_storage "databasus-backend/internal/features/storages/models/sftp"
+	"databasus-backend/internal/util/encryption"
+	"databasus-backend/internal/util/logger"
 )
 
 type S3Container struct {
@@ -283,7 +284,7 @@ func setupTestFile() (string, error) {
 	testData := []byte("This is test data for storage testing")
 
 	// 0644 means: owner can read/write
-	err := os.WriteFile(testFilePath, testData, 0644)
+	err := os.WriteFile(testFilePath, testData, 0o644)
 	if err != nil {
 		return "", fmt.Errorf("failed to create test file: %w", err)
 	}

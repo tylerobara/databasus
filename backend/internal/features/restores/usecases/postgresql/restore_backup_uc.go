@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"databasus-backend/internal/config"
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	"databasus-backend/internal/features/backups/backups/encryption"
@@ -25,8 +27,6 @@ import (
 	"databasus-backend/internal/features/storages"
 	util_encryption "databasus-backend/internal/util/encryption"
 	"databasus-backend/internal/util/tools"
-
-	"github.com/google/uuid"
 )
 
 type RestorePostgresqlBackupUsecase struct {
@@ -992,10 +992,10 @@ func (uc *RestorePostgresqlBackupUsecase) createTempPgpassFile(
 	)
 
 	tempFolder := config.GetEnv().TempFolder
-	if err := os.MkdirAll(tempFolder, 0700); err != nil {
+	if err := os.MkdirAll(tempFolder, 0o700); err != nil {
 		return "", fmt.Errorf("failed to ensure temp folder exists: %w", err)
 	}
-	if err := os.Chmod(tempFolder, 0700); err != nil {
+	if err := os.Chmod(tempFolder, 0o700); err != nil {
 		return "", fmt.Errorf("failed to set temp folder permissions: %w", err)
 	}
 
@@ -1004,13 +1004,13 @@ func (uc *RestorePostgresqlBackupUsecase) createTempPgpassFile(
 		return "", fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 
-	if err := os.Chmod(tempDir, 0700); err != nil {
+	if err := os.Chmod(tempDir, 0o700); err != nil {
 		_ = os.RemoveAll(tempDir)
 		return "", fmt.Errorf("failed to set temporary directory permissions: %w", err)
 	}
 
 	pgpassFile := filepath.Join(tempDir, ".pgpass")
-	err = os.WriteFile(pgpassFile, []byte(pgpassContent), 0600)
+	err = os.WriteFile(pgpassFile, []byte(pgpassContent), 0o600)
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
 		return "", fmt.Errorf("failed to write temporary .pgpass file: %w", err)

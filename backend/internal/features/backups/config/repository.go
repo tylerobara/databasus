@@ -1,11 +1,12 @@
 package backups_config
 
 import (
-	"databasus-backend/internal/storage"
 	"errors"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"databasus-backend/internal/storage"
 )
 
 type BackupConfigRepository struct{}
@@ -47,7 +48,6 @@ func (r *BackupConfigRepository) Save(
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

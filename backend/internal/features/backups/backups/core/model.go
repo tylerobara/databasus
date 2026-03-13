@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	backups_config "databasus-backend/internal/features/backups/config"
 	files_utils "databasus-backend/internal/util/files"
-
-	"github.com/google/uuid"
 )
 
 type PgWalBackupType string

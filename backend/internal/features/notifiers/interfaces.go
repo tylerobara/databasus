@@ -1,10 +1,11 @@
 package notifiers
 
 import (
-	"databasus-backend/internal/util/encryption"
 	"log/slog"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 type NotificationSender interface {

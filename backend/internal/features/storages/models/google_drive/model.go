@@ -2,7 +2,6 @@ package google_drive_storage
 
 import (
 	"context"
-	"databasus-backend/internal/util/encryption"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,10 +15,11 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-
 	drive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 const (
@@ -633,7 +633,6 @@ func (s *GoogleDriveStorage) deleteByName(
 
 			return nil
 		})
-
 	if err != nil {
 		return fmt.Errorf("failed to delete %q: %w", name, err)
 	}

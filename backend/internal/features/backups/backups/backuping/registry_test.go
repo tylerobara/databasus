@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	cache_utils "databasus-backend/internal/util/cache"
-	"databasus-backend/internal/util/logger"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	cache_utils "databasus-backend/internal/util/cache"
+	"databasus-backend/internal/util/logger"
 )
 
 func Test_HearthbeatNodeInRegistry_RegistersNodeWithTTL(t *testing.T) {
@@ -903,7 +903,7 @@ func Test_SubscribeForBackupsCompletions_ReceivesCompletedBackups(t *testing.T) 
 
 	receivedBackupID := make(chan uuid.UUID, 1)
 	receivedNodeID := make(chan uuid.UUID, 1)
-	handler := func(nodeID uuid.UUID, backupID uuid.UUID) {
+	handler := func(nodeID, backupID uuid.UUID) {
 		receivedNodeID <- nodeID
 		receivedBackupID <- backupID
 	}
@@ -940,7 +940,7 @@ func Test_SubscribeForBackupsCompletions_ParsesJsonCorrectly(t *testing.T) {
 	defer registry.UnsubscribeForBackupsCompletions()
 
 	receivedBackups := make(chan uuid.UUID, 2)
-	handler := func(nodeID uuid.UUID, backupID uuid.UUID) {
+	handler := func(nodeID, backupID uuid.UUID) {
 		receivedBackups <- backupID
 	}
 
@@ -969,7 +969,7 @@ func Test_SubscribeForBackupsCompletions_HandlesInvalidJson(t *testing.T) {
 	defer registry.UnsubscribeForBackupsCompletions()
 
 	receivedBackupID := make(chan uuid.UUID, 1)
-	handler := func(nodeID uuid.UUID, backupID uuid.UUID) {
+	handler := func(nodeID, backupID uuid.UUID) {
 		receivedBackupID <- backupID
 	}
 
@@ -997,7 +997,7 @@ func Test_UnsubscribeForBackupsCompletions_StopsReceivingMessages(t *testing.T) 
 	backupID2 := uuid.New()
 
 	receivedBackupID := make(chan uuid.UUID, 2)
-	handler := func(nodeID uuid.UUID, backupID uuid.UUID) {
+	handler := func(nodeID, backupID uuid.UUID) {
 		receivedBackupID <- backupID
 	}
 
@@ -1032,7 +1032,7 @@ func Test_SubscribeForBackupsCompletions_WhenAlreadySubscribed_ReturnsError(t *t
 	registry := createTestRegistry()
 	defer registry.UnsubscribeForBackupsCompletions()
 
-	handler := func(nodeID uuid.UUID, backupID uuid.UUID) {}
+	handler := func(nodeID, backupID uuid.UUID) {}
 
 	err := registry.SubscribeForBackupsCompletions(handler)
 	assert.NoError(t, err)
@@ -1064,9 +1064,9 @@ func Test_MultipleSubscribers_EachReceivesCompletionMessages(t *testing.T) {
 	receivedBackups2 := make(chan uuid.UUID, 3)
 	receivedBackups3 := make(chan uuid.UUID, 3)
 
-	handler1 := func(nodeID uuid.UUID, backupID uuid.UUID) { receivedBackups1 <- backupID }
-	handler2 := func(nodeID uuid.UUID, backupID uuid.UUID) { receivedBackups2 <- backupID }
-	handler3 := func(nodeID uuid.UUID, backupID uuid.UUID) { receivedBackups3 <- backupID }
+	handler1 := func(nodeID, backupID uuid.UUID) { receivedBackups1 <- backupID }
+	handler2 := func(nodeID, backupID uuid.UUID) { receivedBackups2 <- backupID }
+	handler3 := func(nodeID, backupID uuid.UUID) { receivedBackups3 <- backupID }
 
 	err := registry1.SubscribeForBackupsCompletions(handler1)
 	assert.NoError(t, err)

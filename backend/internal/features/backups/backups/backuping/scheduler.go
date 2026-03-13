@@ -441,7 +441,7 @@ func (s *BackupsScheduler) calculateLeastBusyNode() (*uuid.UUID, error) {
 	return &bestNode.ID, nil
 }
 
-func (s *BackupsScheduler) onBackupCompleted(nodeID uuid.UUID, backupID uuid.UUID) {
+func (s *BackupsScheduler) onBackupCompleted(nodeID, backupID uuid.UUID) {
 	// Verify this task is actually a backup (registry contains multiple task types)
 	_, err := s.backupRepository.FindByID(backupID)
 	if err != nil {

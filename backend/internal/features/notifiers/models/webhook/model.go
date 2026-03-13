@@ -2,7 +2,6 @@ package webhook_notifier
 
 import (
 	"bytes"
-	"databasus-backend/internal/util/encryption"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 type WebhookHeader struct {
@@ -42,7 +43,6 @@ func (t *WebhookNotifier) TableName() string {
 func (t *WebhookNotifier) BeforeSave(_ *gorm.DB) error {
 	if len(t.Headers) > 0 {
 		data, err := json.Marshal(t.Headers)
-
 		if err != nil {
 			return err
 		}

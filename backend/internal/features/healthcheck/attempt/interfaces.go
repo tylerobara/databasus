@@ -1,10 +1,10 @@
 package healthcheck_attempt
 
 import (
+	"github.com/google/uuid"
+
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/notifiers"
-
-	"github.com/google/uuid"
 )
 
 type HealthcheckAttemptSender interface {

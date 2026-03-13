@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"databasus-backend/internal/util/encryption"
-	"databasus-backend/internal/util/tools"
-
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"databasus-backend/internal/util/encryption"
+	"databasus-backend/internal/util/tools"
 )
 
 type MongodbDatabase struct {
@@ -434,7 +434,6 @@ func (m *MongodbDatabase) CreateReadOnlyUser(
 				},
 			}},
 		}).Err()
-
 		if err != nil {
 			if attempt < maxRetries-1 {
 				continue

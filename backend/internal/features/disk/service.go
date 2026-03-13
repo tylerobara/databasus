@@ -1,12 +1,13 @@
 package disk
 
 import (
-	"databasus-backend/internal/config"
 	"fmt"
 	"path/filepath"
 	"runtime"
 
 	"github.com/shirou/gopsutil/v4/disk"
+
+	"databasus-backend/internal/config"
 )
 
 type DiskService struct{}

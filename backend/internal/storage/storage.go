@@ -1,14 +1,15 @@
 package storage
 
 import (
-	"databasus-backend/internal/config"
-	"databasus-backend/internal/util/logger"
 	"os"
 	"sync"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
+
+	"databasus-backend/internal/config"
+	"databasus-backend/internal/util/logger"
 )
 
 var log = logger.GetLogger()

@@ -146,7 +146,7 @@ func writeConfigJSON(t *testing.T, dir string, cfg Config) {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	require.NoError(t, err)
 
-	require.NoError(t, os.WriteFile(dir+"/"+configFileName, data, 0644))
+	require.NoError(t, os.WriteFile(dir+"/"+configFileName, data, 0o644))
 }
 
 func readConfigJSON(t *testing.T) Config {

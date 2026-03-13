@@ -8,14 +8,18 @@ import (
 	"databasus-backend/internal/util/logger"
 )
 
-var auditLogRepository = &AuditLogRepository{}
-var auditLogService = &AuditLogService{
-	auditLogRepository,
-	logger.GetLogger(),
-}
+var (
+	auditLogRepository = &AuditLogRepository{}
+	auditLogService    = &AuditLogService{
+		auditLogRepository,
+		logger.GetLogger(),
+	}
+)
+
 var auditLogController = &AuditLogController{
 	auditLogService,
 }
+
 var auditLogBackgroundService = &AuditLogBackgroundService{
 	auditLogService: auditLogService,
 	logger:          logger.GetLogger(),

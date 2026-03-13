@@ -2,7 +2,6 @@ package discord_notifier
 
 import (
 	"bytes"
-	"databasus-backend/internal/util/encryption"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 type DiscordNotifier struct {

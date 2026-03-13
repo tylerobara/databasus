@@ -2,7 +2,6 @@ package sftp_storage
 
 import (
 	"context"
-	"databasus-backend/internal/util/encryption"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 const (

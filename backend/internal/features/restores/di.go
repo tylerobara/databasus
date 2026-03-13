@@ -19,21 +19,24 @@ import (
 	"databasus-backend/internal/util/logger"
 )
 
-var restoreRepository = &restores_core.RestoreRepository{}
-var restoreService = &RestoreService{
-	backups_services.GetBackupService(),
-	restoreRepository,
-	storages.GetStorageService(),
-	backups_config.GetBackupConfigService(),
-	usecases.GetRestoreBackupUsecase(),
-	databases.GetDatabaseService(),
-	logger.GetLogger(),
-	workspaces_services.GetWorkspaceService(),
-	audit_logs.GetAuditLogService(),
-	encryption.GetFieldEncryptor(),
-	disk.GetDiskService(),
-	tasks_cancellation.GetTaskCancelManager(),
-}
+var (
+	restoreRepository = &restores_core.RestoreRepository{}
+	restoreService    = &RestoreService{
+		backups_services.GetBackupService(),
+		restoreRepository,
+		storages.GetStorageService(),
+		backups_config.GetBackupConfigService(),
+		usecases.GetRestoreBackupUsecase(),
+		databases.GetDatabaseService(),
+		logger.GetLogger(),
+		workspaces_services.GetWorkspaceService(),
+		audit_logs.GetAuditLogService(),
+		encryption.GetFieldEncryptor(),
+		disk.GetDiskService(),
+		tasks_cancellation.GetTaskCancelManager(),
+	}
+)
+
 var restoreController = &RestoreController{
 	restoreService,
 }

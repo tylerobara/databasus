@@ -3,12 +3,12 @@ package backups_config
 import (
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+
 	"databasus-backend/internal/features/intervals"
 	plans "databasus-backend/internal/features/plan"
 	"databasus-backend/internal/util/period"
-
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_Validate_WhenRetentionTimePeriodIsWeekAndPlanAllowsMonth_ValidationPasses(t *testing.T) {

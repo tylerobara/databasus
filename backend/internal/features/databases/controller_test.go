@@ -862,7 +862,7 @@ func Test_DatabaseSensitiveDataLifecycle_AllTypes(t *testing.T) {
 		name                string
 		databaseType        DatabaseType
 		createDatabase      func(workspaceID uuid.UUID) *Database
-		updateDatabase      func(workspaceID uuid.UUID, databaseID uuid.UUID) *Database
+		updateDatabase      func(workspaceID, databaseID uuid.UUID) *Database
 		verifySensitiveData func(t *testing.T, database *Database)
 		verifyHiddenData    func(t *testing.T, database *Database)
 	}{
@@ -878,7 +878,7 @@ func Test_DatabaseSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					Postgresql:  pgConfig,
 				}
 			},
-			updateDatabase: func(workspaceID uuid.UUID, databaseID uuid.UUID) *Database {
+			updateDatabase: func(workspaceID, databaseID uuid.UUID) *Database {
 				pgConfig := getTestPostgresConfig()
 				pgConfig.Password = ""
 				return &Database{
@@ -914,7 +914,7 @@ func Test_DatabaseSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					Mariadb:     mariaConfig,
 				}
 			},
-			updateDatabase: func(workspaceID uuid.UUID, databaseID uuid.UUID) *Database {
+			updateDatabase: func(workspaceID, databaseID uuid.UUID) *Database {
 				mariaConfig := getTestMariadbConfig()
 				mariaConfig.Password = ""
 				return &Database{
@@ -950,7 +950,7 @@ func Test_DatabaseSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					Mongodb:     mongoConfig,
 				}
 			},
-			updateDatabase: func(workspaceID uuid.UUID, databaseID uuid.UUID) *Database {
+			updateDatabase: func(workspaceID, databaseID uuid.UUID) *Database {
 				mongoConfig := getTestMongodbConfig()
 				mongoConfig.Password = ""
 				return &Database{

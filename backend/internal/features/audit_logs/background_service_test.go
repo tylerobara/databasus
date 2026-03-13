@@ -1,17 +1,17 @@
 package audit_logs
 
 import (
-	"databasus-backend/internal/storage"
 	"fmt"
 	"testing"
 	"time"
 
-	user_enums "databasus-backend/internal/features/users/enums"
-	users_testing "databasus-backend/internal/features/users/testing"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
+
+	user_enums "databasus-backend/internal/features/users/enums"
+	users_testing "databasus-backend/internal/features/users/testing"
+	"databasus-backend/internal/storage"
 )
 
 func Test_CleanOldAuditLogs_DeletesLogsOlderThanOneYear(t *testing.T) {

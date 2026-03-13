@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache_utils "databasus-backend/internal/util/cache"
-
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-go"
+
+	cache_utils "databasus-backend/internal/util/cache"
 )
 
 const (
@@ -415,7 +415,7 @@ func (r *BackupNodesRegistry) UnsubscribeNodeForBackupsAssignments() error {
 	return nil
 }
 
-func (r *BackupNodesRegistry) PublishBackupCompletion(nodeID uuid.UUID, backupID uuid.UUID) error {
+func (r *BackupNodesRegistry) PublishBackupCompletion(nodeID, backupID uuid.UUID) error {
 	ctx := context.Background()
 
 	message := BackupCompletionMessage{
@@ -437,7 +437,7 @@ func (r *BackupNodesRegistry) PublishBackupCompletion(nodeID uuid.UUID, backupID
 }
 
 func (r *BackupNodesRegistry) SubscribeForBackupsCompletions(
-	handler func(nodeID uuid.UUID, backupID uuid.UUID),
+	handler func(nodeID, backupID uuid.UUID),
 ) error {
 	ctx := context.Background()
 

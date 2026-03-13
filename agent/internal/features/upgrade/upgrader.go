@@ -56,7 +56,7 @@ func CheckAndUpdate(databasusHost, currentVersion string, isDev bool, log Logger
 		return fmt.Errorf("failed to download update: %w", err)
 	}
 
-	if err := os.Chmod(tempPath, 0755); err != nil {
+	if err := os.Chmod(tempPath, 0o755); err != nil {
 		return fmt.Errorf("failed to set permissions on update: %w", err)
 	}
 

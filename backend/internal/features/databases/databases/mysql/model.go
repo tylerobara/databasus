@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"databasus-backend/internal/util/encryption"
-	"databasus-backend/internal/util/tools"
-
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/util/encryption"
+	"databasus-backend/internal/util/tools"
 )
 
 type MysqlDatabase struct {
@@ -403,7 +403,7 @@ func HasPrivilege(privileges, priv string) bool {
 	return false
 }
 
-func (m *MysqlDatabase) buildDSN(password string, database string) string {
+func (m *MysqlDatabase) buildDSN(password, database string) string {
 	tlsConfig := "false"
 	allowCleartext := ""
 

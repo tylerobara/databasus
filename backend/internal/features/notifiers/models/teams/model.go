@@ -2,7 +2,6 @@ package teams_notifier
 
 import (
 	"bytes"
-	"databasus-backend/internal/util/encryption"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 type TeamsNotifier struct {

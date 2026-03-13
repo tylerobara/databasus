@@ -286,10 +286,10 @@ func (uc *RestoreMariadbBackupUsecase) createTempMyCnfFile(
 	password string,
 ) (string, error) {
 	tempFolder := config.GetEnv().TempFolder
-	if err := os.MkdirAll(tempFolder, 0700); err != nil {
+	if err := os.MkdirAll(tempFolder, 0o700); err != nil {
 		return "", fmt.Errorf("failed to ensure temp folder exists: %w", err)
 	}
-	if err := os.Chmod(tempFolder, 0700); err != nil {
+	if err := os.Chmod(tempFolder, 0o700); err != nil {
 		return "", fmt.Errorf("failed to set temp folder permissions: %w", err)
 	}
 
@@ -298,7 +298,7 @@ func (uc *RestoreMariadbBackupUsecase) createTempMyCnfFile(
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	if err := os.Chmod(tempDir, 0700); err != nil {
+	if err := os.Chmod(tempDir, 0o700); err != nil {
 		_ = os.RemoveAll(tempDir)
 		return "", fmt.Errorf("failed to set temp directory permissions: %w", err)
 	}
@@ -318,7 +318,7 @@ port=%d
 		content += "ssl=false\n"
 	}
 
-	err = os.WriteFile(myCnfFile, []byte(content), 0600)
+	err = os.WriteFile(myCnfFile, []byte(content), 0o600)
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
 		return "", fmt.Errorf("failed to write .my.cnf: %w", err)

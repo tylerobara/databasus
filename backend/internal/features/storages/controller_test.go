@@ -6,6 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+
 	"databasus-backend/internal/config"
 	audit_logs "databasus-backend/internal/features/audit_logs"
 	azure_blob_storage "databasus-backend/internal/features/storages/models/azure_blob"
@@ -25,10 +29,6 @@ import (
 	workspaces_testing "databasus-backend/internal/features/workspaces/testing"
 	"databasus-backend/internal/util/encryption"
 	test_utils "databasus-backend/internal/util/testing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockStorageDatabaseCounter struct{}
@@ -1128,7 +1128,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 		name                string
 		storageType         StorageType
 		createStorage       func(workspaceID uuid.UUID) *Storage
-		updateStorage       func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage
+		updateStorage       func(workspaceID, storageID uuid.UUID) *Storage
 		verifySensitiveData func(t *testing.T, storage *Storage)
 		verifyHiddenData    func(t *testing.T, storage *Storage)
 	}{
@@ -1149,7 +1149,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1195,7 +1195,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					LocalStorage: &local_storage.LocalStorage{},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:           storageID,
 					WorkspaceID:  workspaceID,
@@ -1229,7 +1229,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1277,7 +1277,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1327,7 +1327,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1375,7 +1375,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1436,7 +1436,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1484,7 +1484,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -1535,7 +1535,7 @@ func Test_StorageSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateStorage: func(workspaceID uuid.UUID, storageID uuid.UUID) *Storage {
+			updateStorage: func(workspaceID, storageID uuid.UUID) *Storage {
 				return &Storage{
 					ID:          storageID,
 					WorkspaceID: workspaceID,
@@ -2136,7 +2136,7 @@ func createNewStorage(workspaceID uuid.UUID) *Storage {
 	}
 }
 
-func verifyStorageData(t *testing.T, expected *Storage, actual *Storage) {
+func verifyStorageData(t *testing.T, expected, actual *Storage) {
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.Type, actual.Type)
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)

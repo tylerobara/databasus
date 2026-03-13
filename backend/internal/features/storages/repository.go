@@ -1,10 +1,10 @@
 package storages
 
 import (
-	db "databasus-backend/internal/storage"
-
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	db "databasus-backend/internal/storage"
 )
 
 type StorageRepository struct{}
@@ -123,7 +123,6 @@ func (r *StorageRepository) Save(storage *Storage) (*Storage, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

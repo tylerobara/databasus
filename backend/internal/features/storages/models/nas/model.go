@@ -3,7 +3,6 @@ package nas_storage
 import (
 	"context"
 	"crypto/tls"
-	"databasus-backend/internal/util/encryption"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hirochachacha/go-smb2"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 const (
@@ -399,7 +400,7 @@ func (n *NASStorage) ensureDirectory(fs *smb2.Share, path string) error {
 		_, err := fs.Stat(currentPath)
 		if err != nil {
 			// Directory doesn't exist, try to create it
-			err = fs.Mkdir(currentPath, 0755)
+			err = fs.Mkdir(currentPath, 0o755)
 			if err != nil {
 				return fmt.Errorf("failed to create directory '%s': %w", currentPath, err)
 			}

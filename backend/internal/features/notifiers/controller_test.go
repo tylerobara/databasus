@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+
 	"databasus-backend/internal/config"
 	audit_logs "databasus-backend/internal/features/audit_logs"
 	discord_notifier "databasus-backend/internal/features/notifiers/models/discord"
@@ -20,10 +24,6 @@ import (
 	workspaces_controllers "databasus-backend/internal/features/workspaces/controllers"
 	workspaces_testing "databasus-backend/internal/features/workspaces/testing"
 	test_utils "databasus-backend/internal/util/testing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_SaveNewNotifier_NotifierReturnedViaGet(t *testing.T) {
@@ -455,7 +455,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 		name                string
 		notifierType        NotifierType
 		createNotifier      func(workspaceID uuid.UUID) *Notifier
-		updateNotifier      func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier
+		updateNotifier      func(workspaceID, notifierID uuid.UUID) *Notifier
 		verifySensitiveData func(t *testing.T, notifier *Notifier)
 		verifyHiddenData    func(t *testing.T, notifier *Notifier)
 	}{
@@ -473,7 +473,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateNotifier: func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier {
+			updateNotifier: func(workspaceID, notifierID uuid.UUID) *Notifier {
 				return &Notifier{
 					ID:           notifierID,
 					WorkspaceID:  workspaceID,
@@ -515,7 +515,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateNotifier: func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier {
+			updateNotifier: func(workspaceID, notifierID uuid.UUID) *Notifier {
 				return &Notifier{
 					ID:           notifierID,
 					WorkspaceID:  workspaceID,
@@ -557,7 +557,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateNotifier: func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier {
+			updateNotifier: func(workspaceID, notifierID uuid.UUID) *Notifier {
 				return &Notifier{
 					ID:           notifierID,
 					WorkspaceID:  workspaceID,
@@ -595,7 +595,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateNotifier: func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier {
+			updateNotifier: func(workspaceID, notifierID uuid.UUID) *Notifier {
 				return &Notifier{
 					ID:           notifierID,
 					WorkspaceID:  workspaceID,
@@ -636,7 +636,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateNotifier: func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier {
+			updateNotifier: func(workspaceID, notifierID uuid.UUID) *Notifier {
 				return &Notifier{
 					ID:           notifierID,
 					WorkspaceID:  workspaceID,
@@ -682,7 +682,7 @@ func Test_NotifierSensitiveDataLifecycle_AllTypes(t *testing.T) {
 					},
 				}
 			},
-			updateNotifier: func(workspaceID uuid.UUID, notifierID uuid.UUID) *Notifier {
+			updateNotifier: func(workspaceID, notifierID uuid.UUID) *Notifier {
 				return &Notifier{
 					ID:           notifierID,
 					WorkspaceID:  workspaceID,
@@ -1265,7 +1265,7 @@ func createTelegramNotifier(workspaceID uuid.UUID) *Notifier {
 	}
 }
 
-func verifyNotifierData(t *testing.T, expected *Notifier, actual *Notifier) {
+func verifyNotifierData(t *testing.T, expected, actual *Notifier) {
 	assert.Equal(t, expected.Name, actual.Name)
 	assert.Equal(t, expected.NotifierType, actual.NotifierType)
 	assert.Equal(t, expected.WorkspaceID, actual.WorkspaceID)

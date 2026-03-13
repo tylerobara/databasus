@@ -12,16 +12,19 @@ import (
 	"databasus-backend/internal/util/logger"
 )
 
-var backupConfigRepository = &BackupConfigRepository{}
-var backupConfigService = &BackupConfigService{
-	backupConfigRepository,
-	databases.GetDatabaseService(),
-	storages.GetStorageService(),
-	notifiers.GetNotifierService(),
-	workspaces_services.GetWorkspaceService(),
-	plans.GetDatabasePlanService(),
-	nil,
-}
+var (
+	backupConfigRepository = &BackupConfigRepository{}
+	backupConfigService    = &BackupConfigService{
+		backupConfigRepository,
+		databases.GetDatabaseService(),
+		storages.GetStorageService(),
+		notifiers.GetNotifierService(),
+		workspaces_services.GetWorkspaceService(),
+		plans.GetDatabasePlanService(),
+		nil,
+	}
+)
+
 var backupConfigController = &BackupConfigController{
 	backupConfigService,
 }

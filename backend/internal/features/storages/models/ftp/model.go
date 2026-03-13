@@ -3,7 +3,6 @@ package ftp_storage
 import (
 	"context"
 	"crypto/tls"
-	"databasus-backend/internal/util/encryption"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jlaffaye/ftp"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 const (

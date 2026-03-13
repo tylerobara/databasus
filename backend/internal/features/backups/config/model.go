@@ -1,16 +1,17 @@
 package backups_config
 
 import (
-	"databasus-backend/internal/config"
-	"databasus-backend/internal/features/intervals"
-	plans "databasus-backend/internal/features/plan"
-	"databasus-backend/internal/features/storages"
-	"databasus-backend/internal/util/period"
 	"errors"
 	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"databasus-backend/internal/config"
+	"databasus-backend/internal/features/intervals"
+	plans "databasus-backend/internal/features/plan"
+	"databasus-backend/internal/features/storages"
+	"databasus-backend/internal/util/period"
 )
 
 type BackupConfig struct {

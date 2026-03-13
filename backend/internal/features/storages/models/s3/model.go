@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/tls"
-	"databasus-backend/internal/util/encryption"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -19,6 +18,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+
+	"databasus-backend/internal/util/encryption"
 )
 
 const (
@@ -423,7 +424,7 @@ func (s *S3Storage) getCoreClient(encryptor encryption.FieldEncryptor) (*minio.C
 
 func (s *S3Storage) getClientParams(
 	encryptor encryption.FieldEncryptor,
-) (endpoint string, useSSL bool, accessKey string, secretKey string, bucketLookup minio.BucketLookupType, transport *http.Transport, err error) {
+) (endpoint string, useSSL bool, accessKey, secretKey string, bucketLookup minio.BucketLookupType, transport *http.Transport, err error) {
 	endpoint = s.S3Endpoint
 	useSSL = true
 

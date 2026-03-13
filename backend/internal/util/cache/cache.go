@@ -3,10 +3,11 @@ package cache_utils
 import (
 	"context"
 	"crypto/tls"
-	"databasus-backend/internal/config"
 	"sync"
 
 	"github.com/valkey-io/valkey-go"
+
+	"databasus-backend/internal/config"
 )
 
 var (

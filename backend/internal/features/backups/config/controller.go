@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	users_middleware "databasus-backend/internal/features/users/middleware"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	users_middleware "databasus-backend/internal/features/users/middleware"
 )
 
 type BackupConfigController struct {

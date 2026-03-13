@@ -5,8 +5,10 @@ import (
 	"databasus-backend/internal/util/logger"
 )
 
-var env = config.GetEnv()
-var log = logger.GetLogger()
+var (
+	env = config.GetEnv()
+	log = logger.GetLogger()
+)
 
 var emailSMTPSender = &EmailSMTPSender{
 	log,

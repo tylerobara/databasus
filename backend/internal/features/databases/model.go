@@ -2,17 +2,18 @@ package databases
 
 import (
 	"context"
+	"errors"
+	"log/slog"
+	"time"
+
+	"github.com/google/uuid"
+
 	"databasus-backend/internal/features/databases/databases/mariadb"
 	"databasus-backend/internal/features/databases/databases/mongodb"
 	"databasus-backend/internal/features/databases/databases/mysql"
 	"databasus-backend/internal/features/databases/databases/postgresql"
 	"databasus-backend/internal/features/notifiers"
 	"databasus-backend/internal/util/encryption"
-	"errors"
-	"log/slog"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 type Database struct {

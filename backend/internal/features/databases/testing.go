@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	"databasus-backend/internal/config"
 	"databasus-backend/internal/features/databases/databases/mariadb"
 	"databasus-backend/internal/features/databases/databases/mongodb"
@@ -12,8 +14,6 @@ import (
 	"databasus-backend/internal/features/storages"
 	"databasus-backend/internal/storage"
 	"databasus-backend/internal/util/tools"
-
-	"github.com/google/uuid"
 )
 
 func GetTestPostgresConfig() *postgresql.PostgresqlDatabase {

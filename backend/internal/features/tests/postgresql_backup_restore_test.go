@@ -376,7 +376,7 @@ func Test_BackupAndRestorePostgresql_WithReadOnlyUser_RestoreIsSuccessful(t *tes
 	}
 }
 
-func testBackupRestoreForVersion(t *testing.T, pgVersion string, port string, cpuCount int) {
+func testBackupRestoreForVersion(t *testing.T, pgVersion, port string, cpuCount int) {
 	container, err := connectToPostgresContainer(pgVersion, port)
 	assert.NoError(t, err)
 	defer func() {
@@ -478,7 +478,7 @@ func testBackupRestoreForVersion(t *testing.T, pgVersion string, port string, cp
 	workspaces_testing.RemoveTestWorkspace(workspace, router)
 }
 
-func testSchemaSelectionAllSchemasForVersion(t *testing.T, pgVersion string, port string) {
+func testSchemaSelectionAllSchemasForVersion(t *testing.T, pgVersion, port string) {
 	container, err := connectToPostgresContainer(pgVersion, port)
 	if err != nil {
 		t.Fatalf("Failed to connect to PostgreSQL container: %v", err)
@@ -607,7 +607,7 @@ func testSchemaSelectionAllSchemasForVersion(t *testing.T, pgVersion string, por
 	workspaces_testing.RemoveTestWorkspace(workspace, router)
 }
 
-func testBackupRestoreWithExcludeExtensionsForVersion(t *testing.T, pgVersion string, port string) {
+func testBackupRestoreWithExcludeExtensionsForVersion(t *testing.T, pgVersion, port string) {
 	container, err := connectToPostgresContainer(pgVersion, port)
 	if err != nil {
 		t.Fatalf("Failed to connect to PostgreSQL container: %v", err)
@@ -885,7 +885,7 @@ func testBackupRestoreWithoutExcludeExtensionsForVersion(
 	workspaces_testing.RemoveTestWorkspace(workspace, router)
 }
 
-func testBackupRestoreWithReadOnlyUserForVersion(t *testing.T, pgVersion string, port string) {
+func testBackupRestoreWithReadOnlyUserForVersion(t *testing.T, pgVersion, port string) {
 	container, err := connectToPostgresContainer(pgVersion, port)
 	assert.NoError(t, err)
 	defer func() {
@@ -1128,7 +1128,7 @@ func testSchemaSelectionOnlySpecifiedSchemasForVersion(
 	workspaces_testing.RemoveTestWorkspace(workspace, router)
 }
 
-func testBackupRestoreWithEncryptionForVersion(t *testing.T, pgVersion string, port string) {
+func testBackupRestoreWithEncryptionForVersion(t *testing.T, pgVersion, port string) {
 	container, err := connectToPostgresContainer(pgVersion, port)
 	assert.NoError(t, err)
 	defer func() {
@@ -1673,7 +1673,7 @@ func createSupabaseRestoreViaAPI(
 	)
 }
 
-func verifyDataIntegrity(t *testing.T, originalDB *sqlx.DB, restoredDB *sqlx.DB, tableName string) {
+func verifyDataIntegrity(t *testing.T, originalDB, restoredDB *sqlx.DB, tableName string) {
 	var originalData []TestDataItem
 	var restoredData []TestDataItem
 
@@ -1755,7 +1755,7 @@ func updateDatabaseCredentialsViaAPI(
 	return &updatedDatabase
 }
 
-func connectToPostgresContainer(version string, port string) (*PostgresContainer, error) {
+func connectToPostgresContainer(version, port string) (*PostgresContainer, error) {
 	dbName := "testdb"
 	password := "testpassword"
 	username := "testuser"

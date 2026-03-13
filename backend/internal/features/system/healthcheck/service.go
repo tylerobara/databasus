@@ -2,13 +2,14 @@ package system_healthcheck
 
 import (
 	"context"
+	"errors"
+	"time"
+
 	"databasus-backend/internal/config"
 	"databasus-backend/internal/features/backups/backups/backuping"
 	"databasus-backend/internal/features/disk"
 	"databasus-backend/internal/storage"
 	cache_utils "databasus-backend/internal/util/cache"
-	"errors"
-	"time"
 )
 
 type HealthcheckService struct {
@@ -43,7 +44,6 @@ func (s *HealthcheckService) performHealthCheck() error {
 
 	db := storage.GetDb()
 	err = db.Raw("SELECT 1").Error
-
 	if err != nil {
 		return errors.New("cannot connect to the database")
 	}
@@ -61,7 +61,6 @@ func (s *HealthcheckService) performHealthCheck() error {
 	if config.GetEnv().IsProcessingNode {
 		if !s.backuperNode.IsBackuperRunning() {
 			return errors.New("backuper node is not running for more than 5 minutes")
-
 		}
 	}
 

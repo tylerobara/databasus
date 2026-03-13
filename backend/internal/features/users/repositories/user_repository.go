@@ -1,14 +1,15 @@
 package users_repositories
 
 import (
-	users_enums "databasus-backend/internal/features/users/enums"
-	users_models "databasus-backend/internal/features/users/models"
-	"databasus-backend/internal/storage"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	users_enums "databasus-backend/internal/features/users/enums"
+	users_models "databasus-backend/internal/features/users/models"
+	"databasus-backend/internal/storage"
 )
 
 type UserRepository struct{}
@@ -156,7 +157,7 @@ func (r *UserRepository) RenameUserEmailForTests(oldEmail, newEmail string) erro
 	return nil
 }
 
-func (r *UserRepository) UpdateUserInfo(userID uuid.UUID, name *string, email *string) error {
+func (r *UserRepository) UpdateUserInfo(userID uuid.UUID, name, email *string) error {
 	updates := make(map[string]any)
 
 	if name != nil {

@@ -237,7 +237,6 @@ func (n *RestorerNode) MakeRestore(restoreID uuid.UUID) {
 		storage,
 		isExcludeExtensions,
 	)
-
 	if err != nil {
 		errMsg := err.Error()
 

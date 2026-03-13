@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
+
 	users_dto "databasus-backend/internal/features/users/dto"
 	users_enums "databasus-backend/internal/features/users/enums"
 	users_models "databasus-backend/internal/features/users/models"
@@ -12,10 +16,6 @@ import (
 	users_testing "databasus-backend/internal/features/users/testing"
 	"databasus-backend/internal/storage"
 	test_utils "databasus-backend/internal/util/testing"
-
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func Test_SendResetPasswordCode_WithValidEmail_CodeSent(t *testing.T) {

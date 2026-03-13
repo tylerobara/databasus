@@ -13,9 +13,11 @@ var downloadTokenRepository = &DownloadTokenRepository{}
 
 var downloadTracker = NewDownloadTracker(cache_utils.GetValkeyClient())
 
-var bandwidthManager *BandwidthManager
-var downloadTokenService *DownloadTokenService
-var downloadTokenBackgroundService *DownloadTokenBackgroundService
+var (
+	bandwidthManager               *BandwidthManager
+	downloadTokenService           *DownloadTokenService
+	downloadTokenBackgroundService *DownloadTokenBackgroundService
+)
 
 func init() {
 	env := config.GetEnv()

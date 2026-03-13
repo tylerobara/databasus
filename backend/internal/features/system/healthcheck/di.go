@@ -10,6 +10,7 @@ var healthcheckService = &HealthcheckService{
 	backuping.GetBackupsScheduler(),
 	backuping.GetBackuperNode(),
 }
+
 var healthcheckController = &HealthcheckController{
 	healthcheckService,
 }

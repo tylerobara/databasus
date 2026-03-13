@@ -2,9 +2,6 @@ package local_storage
 
 import (
 	"context"
-	"databasus-backend/internal/config"
-	"databasus-backend/internal/util/encryption"
-	files_utils "databasus-backend/internal/util/files"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/config"
+	"databasus-backend/internal/util/encryption"
+	files_utils "databasus-backend/internal/util/files"
 )
 
 const (

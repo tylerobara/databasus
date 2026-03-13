@@ -2,6 +2,12 @@ package storages
 
 import (
 	"context"
+	"errors"
+	"io"
+	"log/slog"
+
+	"github.com/google/uuid"
+
 	azure_blob_storage "databasus-backend/internal/features/storages/models/azure_blob"
 	ftp_storage "databasus-backend/internal/features/storages/models/ftp"
 	google_drive_storage "databasus-backend/internal/features/storages/models/google_drive"
@@ -11,11 +17,6 @@ import (
 	s3_storage "databasus-backend/internal/features/storages/models/s3"
 	sftp_storage "databasus-backend/internal/features/storages/models/sftp"
 	"databasus-backend/internal/util/encryption"
-	"errors"
-	"io"
-	"log/slog"
-
-	"github.com/google/uuid"
 )
 
 type Storage struct {

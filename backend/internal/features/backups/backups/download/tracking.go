@@ -1,12 +1,13 @@
 package backups_download
 
 import (
-	cache_utils "databasus-backend/internal/util/cache"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-go"
+
+	cache_utils "databasus-backend/internal/util/cache"
 )
 
 const (
@@ -16,9 +17,7 @@ const (
 	downloadHeartbeatDelay = 3 * time.Second
 )
 
-var (
-	ErrDownloadAlreadyInProgress = errors.New("download already in progress for this user")
-)
+var ErrDownloadAlreadyInProgress = errors.New("download already in progress for this user")
 
 type DownloadTracker struct {
 	cache *cache_utils.CacheUtil[string]

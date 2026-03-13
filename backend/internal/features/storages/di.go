@@ -10,14 +10,17 @@ import (
 	"databasus-backend/internal/util/logger"
 )
 
-var storageRepository = &StorageRepository{}
-var storageService = &StorageService{
-	storageRepository,
-	workspaces_services.GetWorkspaceService(),
-	audit_logs.GetAuditLogService(),
-	encryption.GetFieldEncryptor(),
-	nil,
-}
+var (
+	storageRepository = &StorageRepository{}
+	storageService    = &StorageService{
+		storageRepository,
+		workspaces_services.GetWorkspaceService(),
+		audit_logs.GetAuditLogService(),
+		encryption.GetFieldEncryptor(),
+		nil,
+	}
+)
+
 var storageController = &StorageController{
 	storageService,
 	workspaces_services.GetWorkspaceService(),

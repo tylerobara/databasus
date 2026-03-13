@@ -1,9 +1,6 @@
 package healthcheck_attempt
 
 import (
-	"databasus-backend/internal/features/databases"
-	healthcheck_config "databasus-backend/internal/features/healthcheck/config"
-	"databasus-backend/internal/util/logger"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +8,10 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"databasus-backend/internal/features/databases"
+	healthcheck_config "databasus-backend/internal/features/healthcheck/config"
+	"databasus-backend/internal/util/logger"
 )
 
 type CheckDatabaseHealthUseCase struct {
@@ -251,5 +252,4 @@ func (uc *CheckDatabaseHealthUseCase) sendDbStatusNotification(
 			messageBody,
 		)
 	}
-
 }

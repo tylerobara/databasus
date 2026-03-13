@@ -1,11 +1,12 @@
 package plans
 
 import (
-	"databasus-backend/internal/config"
-	"databasus-backend/internal/util/period"
 	"log/slog"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/config"
+	"databasus-backend/internal/util/period"
 )
 
 type DatabasePlanService struct {

@@ -587,7 +587,7 @@ func waitForMariadbRestoreCompletion(
 	}
 }
 
-func verifyMariadbDataIntegrity(t *testing.T, originalDB *sqlx.DB, restoredDB *sqlx.DB) {
+func verifyMariadbDataIntegrity(t *testing.T, originalDB, restoredDB *sqlx.DB) {
 	var originalData []MariadbTestDataItem
 	var restoredData []MariadbTestDataItem
 

@@ -5,13 +5,14 @@ import (
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/sha256"
-	"databasus-backend/internal/features/encryption/secrets"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
+
+	"databasus-backend/internal/features/encryption/secrets"
 )
 
 const encryptedPrefix = "enc:"

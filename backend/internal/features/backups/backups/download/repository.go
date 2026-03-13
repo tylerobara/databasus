@@ -2,12 +2,13 @@ package backups_download
 
 import (
 	"crypto/rand"
-	"databasus-backend/internal/storage"
 	"encoding/base64"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"databasus-backend/internal/storage"
 )
 
 type DownloadTokenRepository struct{}
@@ -28,7 +29,6 @@ func (r *DownloadTokenRepository) FindByToken(token string) (*DownloadToken, err
 	err := storage.GetDb().
 		Where("token = ?", token).
 		First(&downloadToken).Error
-
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil

@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+
 	"databasus-backend/internal/config"
 	backups_controllers "databasus-backend/internal/features/backups/backups/controllers"
 	backups_core "databasus-backend/internal/features/backups/backups/core"
@@ -18,9 +21,6 @@ import (
 	workspaces_testing "databasus-backend/internal/features/workspaces/testing"
 	cache_utils "databasus-backend/internal/util/cache"
 	"databasus-backend/internal/util/encryption"
-
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_CheckDeadNodesAndFailRestores_NodeDies_FailsRestoreAndCleansUpRegistry(t *testing.T) {

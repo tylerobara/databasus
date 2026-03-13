@@ -10,6 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	backups_dto "databasus-backend/internal/features/backups/backups/dto"
 	backups_config "databasus-backend/internal/features/backups/config"
@@ -23,11 +28,6 @@ import (
 	workspaces_controllers "databasus-backend/internal/features/workspaces/controllers"
 	workspaces_testing "databasus-backend/internal/features/workspaces/testing"
 	test_utils "databasus-backend/internal/util/testing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_WalUpload_InProgressStatusSetBeforeStream(t *testing.T) {

@@ -542,7 +542,7 @@ func waitForMysqlRestoreCompletion(
 	}
 }
 
-func verifyMysqlDataIntegrity(t *testing.T, originalDB *sqlx.DB, restoredDB *sqlx.DB) {
+func verifyMysqlDataIntegrity(t *testing.T, originalDB, restoredDB *sqlx.DB) {
 	var originalData []MysqlTestDataItem
 	var restoredData []MysqlTestDataItem
 

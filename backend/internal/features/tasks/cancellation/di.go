@@ -5,10 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/google/uuid"
+
 	cache_utils "databasus-backend/internal/util/cache"
 	"databasus-backend/internal/util/logger"
-
-	"github.com/google/uuid"
 )
 
 var taskCancelManager = &TaskCancelManager{

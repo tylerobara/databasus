@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"databasus-backend/internal/features/audit_logs"
 	users_dto "databasus-backend/internal/features/users/dto"
 	users_enums "databasus-backend/internal/features/users/enums"
@@ -16,9 +19,6 @@ import (
 	workspaces_dto "databasus-backend/internal/features/workspaces/dto"
 	workspaces_models "databasus-backend/internal/features/workspaces/models"
 	workspaces_repositories "databasus-backend/internal/features/workspaces/repositories"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func CreateTestRouter(controllers ...ControllerInterface) *gin.Engine {

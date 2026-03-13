@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/google/uuid"
+
 	audit_logs "databasus-backend/internal/features/audit_logs"
 	"databasus-backend/internal/features/backups/backups/backuping"
 	backups_core "databasus-backend/internal/features/backups/backups/core"
@@ -23,8 +25,6 @@ import (
 	workspaces_services "databasus-backend/internal/features/workspaces/services"
 	util_encryption "databasus-backend/internal/util/encryption"
 	files_utils "databasus-backend/internal/util/files"
-
-	"github.com/google/uuid"
 )
 
 type BackupService struct {

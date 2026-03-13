@@ -2,13 +2,13 @@ package storages
 
 import (
 	"errors"
-
-	users_middleware "databasus-backend/internal/features/users/middleware"
-	workspaces_services "databasus-backend/internal/features/workspaces/services"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	users_middleware "databasus-backend/internal/features/users/middleware"
+	workspaces_services "databasus-backend/internal/features/workspaces/services"
 )
 
 type StorageController struct {

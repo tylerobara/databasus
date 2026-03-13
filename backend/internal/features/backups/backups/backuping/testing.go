@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	"databasus-backend/internal/features/backups/backups/usecases"
 	backups_config "databasus-backend/internal/features/backups/config"
@@ -19,9 +22,6 @@ import (
 	workspaces_testing "databasus-backend/internal/features/workspaces/testing"
 	"databasus-backend/internal/util/encryption"
 	"databasus-backend/internal/util/logger"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func CreateTestRouter() *gin.Engine {

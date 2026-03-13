@@ -51,7 +51,7 @@ func (c *Config) SaveToJSON() error {
 		return err
 	}
 
-	return os.WriteFile(configFileName, data, 0644)
+	return os.WriteFile(configFileName, data, 0o644)
 }
 
 func (c *Config) loadFromJSON() {

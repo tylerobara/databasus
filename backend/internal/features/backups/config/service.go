@@ -3,6 +3,8 @@ package backups_config
 import (
 	"errors"
 
+	"github.com/google/uuid"
+
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/intervals"
 	"databasus-backend/internal/features/notifiers"
@@ -10,8 +12,6 @@ import (
 	"databasus-backend/internal/features/storages"
 	users_models "databasus-backend/internal/features/users/models"
 	workspaces_services "databasus-backend/internal/features/workspaces/services"
-
-	"github.com/google/uuid"
 )
 
 type BackupConfigService struct {

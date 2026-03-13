@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache_utils "databasus-backend/internal/util/cache"
-
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-go"
+
+	cache_utils "databasus-backend/internal/util/cache"
 )
 
 const (
@@ -453,7 +453,7 @@ func (r *RestoreNodesRegistry) PublishRestoreCompletion(
 }
 
 func (r *RestoreNodesRegistry) SubscribeForRestoresCompletions(
-	handler func(nodeID uuid.UUID, restoreID uuid.UUID),
+	handler func(nodeID, restoreID uuid.UUID),
 ) error {
 	ctx := context.Background()
 

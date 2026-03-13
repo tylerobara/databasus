@@ -1,11 +1,11 @@
 package healthcheck_attempt
 
 import (
-	"databasus-backend/internal/features/databases"
-	"databasus-backend/internal/features/notifiers"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
+
+	"databasus-backend/internal/features/databases"
+	"databasus-backend/internal/features/notifiers"
 )
 
 type MockHealthcheckAttemptSender struct {
