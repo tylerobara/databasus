@@ -165,7 +165,7 @@ jobs:
           go test -count=1 -failfast ./internal/...
 
   e2e-agent:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [lint-agent]
     steps:
       - name: Check out code
@@ -183,6 +183,8 @@ jobs:
           docker compose down -v --rmi local || true
           rm -rf artifacts || true
 
+  # Self-hosted: performant high-frequency CPU is used to start many containers and run tests fast. Tests
+  # step is bottle-neck, because we need a lot of containers and cannot parallelize tests due to shared resources
   test-backend:
     runs-on: self-hosted
     needs: [lint-backend]
