@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,12 +117,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  version  Print agent version")
 }
 
-func runUpdateCheck(host string, isSkipUpdate, isDev bool, log interface {
-	Info(string, ...any)
-	Warn(string, ...any)
-	Error(string, ...any)
-},
-) {
+func runUpdateCheck(host string, isSkipUpdate, isDev bool, log *slog.Logger) {
 	if isSkipUpdate {
 		return
 	}

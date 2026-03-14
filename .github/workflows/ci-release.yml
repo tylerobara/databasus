@@ -164,6 +164,25 @@ jobs:
           cd agent
           go test -count=1 -failfast ./internal/...
 
+  e2e-agent:
+    runs-on: self-hosted
+    needs: [lint-agent]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run e2e tests
+        run: |
+          cd agent
+          make e2e
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd agent/e2e
+          docker compose down -v --rmi local || true
+          rm -rf artifacts || true
+
   test-backend:
     runs-on: self-hosted
     needs: [lint-backend]
@@ -497,7 +516,7 @@ jobs:
     runs-on: self-hosted
     container:
       image: node:20
-    needs: [test-backend, test-frontend, test-agent]
+    needs: [test-backend, test-frontend, test-agent, e2e-agent]
     if: ${{ github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip-release]') }}
     outputs:
       should_release: ${{ steps.version_bump.outputs.should_release }}
@@ -590,7 +609,7 @@ jobs:
 
   build-only:
     runs-on: self-hosted
-    needs: [test-backend, test-frontend, test-agent]
+    needs: [test-backend, test-frontend, test-agent, e2e-agent]
     if: ${{ github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[skip-release]') }}
     steps:
       - name: Clean workspace

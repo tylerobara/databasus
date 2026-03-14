@@ -1,0 +1,14 @@
+# Runs upgrade and host-mode pg_basebackup tests (tests 1-4). Needs
+# Postgres client tools to be installed inside the system
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates curl gnupg2 postgresql-common && \
+    /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y && \
+    apt-get install -y --no-install-recommends \
+      postgresql-client-17 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+ENTRYPOINT []

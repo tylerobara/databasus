@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,17 +15,7 @@ import (
 	"time"
 )
 
-type Logger interface {
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-	Error(msg string, args ...any)
-}
-
-type versionResponse struct {
-	Version string `json:"version"`
-}
-
-func CheckAndUpdate(databasusHost, currentVersion string, isDev bool, log Logger) error {
+func CheckAndUpdate(databasusHost, currentVersion string, isDev bool, log *slog.Logger) error {
 	if isDev {
 		log.Info("Skipping update check (development mode)")
 		return nil
@@ -32,7 +23,11 @@ func CheckAndUpdate(databasusHost, currentVersion string, isDev bool, log Logger
 
 	serverVersion, err := fetchServerVersion(databasusHost, log)
 	if err != nil {
-		return nil
+		return fmt.Errorf(
+			"unable to check version, please verify Databasus server is available at %s: %w",
+			databasusHost,
+			err,
+		)
 	}
 
 	if serverVersion == currentVersion {
@@ -74,7 +69,7 @@ func CheckAndUpdate(databasusHost, currentVersion string, isDev bool, log Logger
 	return syscall.Exec(selfPath, os.Args, os.Environ())
 }
 
-func fetchServerVersion(host string, log Logger) (string, error) {
+func fetchServerVersion(host string, log *slog.Logger) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

@@ -86,10 +86,12 @@ func Test_LoadFromJSONAndArgs_PartialArgsOverrideJSON(t *testing.T) {
 func Test_SaveToJSON_ConfigSavedCorrectly(t *testing.T) {
 	setupTempDir(t)
 
+	deleteWal := true
 	cfg := &Config{
-		DatabasusHost: "http://save-host:4005",
-		DbID:          "save-db-id",
-		Token:         "save-token",
+		DatabasusHost:          "http://save-host:4005",
+		DbID:                   "save-db-id",
+		Token:                  "save-token",
+		IsDeleteWalAfterUpload: &deleteWal,
 	}
 
 	err := cfg.SaveToJSON()
@@ -124,6 +126,143 @@ func Test_SaveToJSON_AfterArgsOverrideJSON_SavedFileContainsMergedValues(t *test
 	assert.Equal(t, "http://override-host:9999", saved.DatabasusHost)
 	assert.Equal(t, "json-db-id", saved.DbID)
 	assert.Equal(t, "json-token", saved.Token)
+}
+
+func Test_LoadFromJSONAndArgs_PgFieldsLoadedFromJSON(t *testing.T) {
+	dir := setupTempDir(t)
+	deleteWal := false
+	writeConfigJSON(t, dir, Config{
+		DatabasusHost:          "http://json-host:4005",
+		DbID:                   "json-db-id",
+		Token:                  "json-token",
+		PgHost:                 "pg-json-host",
+		PgPort:                 5433,
+		PgUser:                 "pg-json-user",
+		PgPassword:             "pg-json-pass",
+		PgType:                 "docker",
+		PgHostBinDir:           "/usr/bin",
+		PgDockerContainerName:  "pg-container",
+		WalDir:                 "/opt/wal",
+		IsDeleteWalAfterUpload: &deleteWal,
+	})
+
+	cfg := &Config{}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg.LoadFromJSONAndArgs(fs, []string{})
+
+	assert.Equal(t, "pg-json-host", cfg.PgHost)
+	assert.Equal(t, 5433, cfg.PgPort)
+	assert.Equal(t, "pg-json-user", cfg.PgUser)
+	assert.Equal(t, "pg-json-pass", cfg.PgPassword)
+	assert.Equal(t, "docker", cfg.PgType)
+	assert.Equal(t, "/usr/bin", cfg.PgHostBinDir)
+	assert.Equal(t, "pg-container", cfg.PgDockerContainerName)
+	assert.Equal(t, "/opt/wal", cfg.WalDir)
+	assert.Equal(t, false, *cfg.IsDeleteWalAfterUpload)
+}
+
+func Test_LoadFromJSONAndArgs_PgFieldsLoadedFromArgs(t *testing.T) {
+	setupTempDir(t)
+
+	cfg := &Config{}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg.LoadFromJSONAndArgs(fs, []string{
+		"--pg-host", "arg-pg-host",
+		"--pg-port", "5433",
+		"--pg-user", "arg-pg-user",
+		"--pg-password", "arg-pg-pass",
+		"--pg-type", "docker",
+		"--pg-host-bin-dir", "/custom/bin",
+		"--pg-docker-container-name", "my-pg",
+		"--wal-dir", "/var/wal",
+	})
+
+	assert.Equal(t, "arg-pg-host", cfg.PgHost)
+	assert.Equal(t, 5433, cfg.PgPort)
+	assert.Equal(t, "arg-pg-user", cfg.PgUser)
+	assert.Equal(t, "arg-pg-pass", cfg.PgPassword)
+	assert.Equal(t, "docker", cfg.PgType)
+	assert.Equal(t, "/custom/bin", cfg.PgHostBinDir)
+	assert.Equal(t, "my-pg", cfg.PgDockerContainerName)
+	assert.Equal(t, "/var/wal", cfg.WalDir)
+}
+
+func Test_LoadFromJSONAndArgs_PgArgsOverrideJSON(t *testing.T) {
+	dir := setupTempDir(t)
+	writeConfigJSON(t, dir, Config{
+		PgHost: "json-host",
+		PgPort: 5432,
+		PgUser: "json-user",
+		PgType: "host",
+		WalDir: "/json/wal",
+	})
+
+	cfg := &Config{}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg.LoadFromJSONAndArgs(fs, []string{
+		"--pg-host", "arg-host",
+		"--pg-port", "5433",
+		"--pg-user", "arg-user",
+		"--pg-type", "docker",
+		"--pg-docker-container-name", "my-container",
+		"--wal-dir", "/arg/wal",
+	})
+
+	assert.Equal(t, "arg-host", cfg.PgHost)
+	assert.Equal(t, 5433, cfg.PgPort)
+	assert.Equal(t, "arg-user", cfg.PgUser)
+	assert.Equal(t, "docker", cfg.PgType)
+	assert.Equal(t, "my-container", cfg.PgDockerContainerName)
+	assert.Equal(t, "/arg/wal", cfg.WalDir)
+}
+
+func Test_LoadFromJSONAndArgs_DefaultsApplied_WhenNoJSONAndNoArgs(t *testing.T) {
+	setupTempDir(t)
+
+	cfg := &Config{}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg.LoadFromJSONAndArgs(fs, []string{})
+
+	assert.Equal(t, 5432, cfg.PgPort)
+	assert.Equal(t, "host", cfg.PgType)
+	require.NotNil(t, cfg.IsDeleteWalAfterUpload)
+	assert.Equal(t, true, *cfg.IsDeleteWalAfterUpload)
+}
+
+func Test_SaveToJSON_PgFieldsSavedCorrectly(t *testing.T) {
+	setupTempDir(t)
+
+	deleteWal := false
+	cfg := &Config{
+		DatabasusHost:          "http://host:4005",
+		DbID:                   "db-id",
+		Token:                  "token",
+		PgHost:                 "pg-host",
+		PgPort:                 5433,
+		PgUser:                 "pg-user",
+		PgPassword:             "pg-pass",
+		PgType:                 "docker",
+		PgHostBinDir:           "/usr/bin",
+		PgDockerContainerName:  "pg-container",
+		WalDir:                 "/opt/wal",
+		IsDeleteWalAfterUpload: &deleteWal,
+	}
+
+	err := cfg.SaveToJSON()
+	require.NoError(t, err)
+
+	saved := readConfigJSON(t)
+
+	assert.Equal(t, "pg-host", saved.PgHost)
+	assert.Equal(t, 5433, saved.PgPort)
+	assert.Equal(t, "pg-user", saved.PgUser)
+	assert.Equal(t, "pg-pass", saved.PgPassword)
+	assert.Equal(t, "docker", saved.PgType)
+	assert.Equal(t, "/usr/bin", saved.PgHostBinDir)
+	assert.Equal(t, "pg-container", saved.PgDockerContainerName)
+	assert.Equal(t, "/opt/wal", saved.WalDir)
+	require.NotNil(t, saved.IsDeleteWalAfterUpload)
+	assert.Equal(t, false, *saved.IsDeleteWalAfterUpload)
 }
 
 func setupTempDir(t *testing.T) string {

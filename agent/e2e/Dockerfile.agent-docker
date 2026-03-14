@@ -1,0 +1,8 @@
+# Runs pg_basebackup-via-docker-exec test (test 5) which tests
+# that the agent can connect to Postgres inside Docker container
+FROM docker:27-cli
+
+RUN apk add --no-cache bash curl
+
+WORKDIR /tmp
+ENTRYPOINT []

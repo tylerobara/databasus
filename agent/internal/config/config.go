@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 
 	"databasus-agent/internal/logger"
@@ -13,9 +14,18 @@ var log = logger.GetLogger()
 const configFileName = "databasus.json"
 
 type Config struct {
-	DatabasusHost string `json:"databasusHost"`
-	DbID          string `json:"dbId"`
-	Token         string `json:"token"`
+	DatabasusHost          string `json:"databasusHost"`
+	DbID                   string `json:"dbId"`
+	Token                  string `json:"token"`
+	PgHost                 string `json:"pgHost"`
+	PgPort                 int    `json:"pgPort"`
+	PgUser                 string `json:"pgUser"`
+	PgPassword             string `json:"pgPassword"`
+	PgType                 string `json:"pgType"`
+	PgHostBinDir           string `json:"pgHostBinDir"`
+	PgDockerContainerName  string `json:"pgDockerContainerName"`
+	WalDir                 string `json:"walDir"`
+	IsDeleteWalAfterUpload *bool  `json:"deleteWalAfterUpload"`
 
 	flags parsedFlags
 }
@@ -24,15 +34,24 @@ type Config struct {
 // and overrides JSON values with any explicitly provided CLI flags.
 func (c *Config) LoadFromJSONAndArgs(fs *flag.FlagSet, args []string) {
 	c.loadFromJSON()
+	c.applyDefaults()
 	c.initSources()
 
-	c.flags.host = fs.String(
+	c.flags.databasusHost = fs.String(
 		"databasus-host",
 		"",
 		"Databasus server URL (e.g. http://your-server:4005)",
 	)
 	c.flags.dbID = fs.String("db-id", "", "Database ID")
 	c.flags.token = fs.String("token", "", "Agent token")
+	c.flags.pgHost = fs.String("pg-host", "", "PostgreSQL host")
+	c.flags.pgPort = fs.Int("pg-port", 0, "PostgreSQL port")
+	c.flags.pgUser = fs.String("pg-user", "", "PostgreSQL user")
+	c.flags.pgPassword = fs.String("pg-password", "", "PostgreSQL password")
+	c.flags.pgType = fs.String("pg-type", "", "PostgreSQL type: host or docker")
+	c.flags.pgHostBinDir = fs.String("pg-host-bin-dir", "", "Path to PG bin directory (host mode)")
+	c.flags.pgDockerContainerName = fs.String("pg-docker-container-name", "", "Docker container name (docker mode)")
+	c.flags.walDir = fs.String("wal-dir", "", "Path to WAL queue directory")
 
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
@@ -76,11 +95,35 @@ func (c *Config) loadFromJSON() {
 	log.Info("Configuration loaded from " + configFileName)
 }
 
+func (c *Config) applyDefaults() {
+	if c.PgPort == 0 {
+		c.PgPort = 5432
+	}
+
+	if c.PgType == "" {
+		c.PgType = "host"
+	}
+
+	if c.IsDeleteWalAfterUpload == nil {
+		v := true
+		c.IsDeleteWalAfterUpload = &v
+	}
+}
+
 func (c *Config) initSources() {
 	c.flags.sources = map[string]string{
-		"databasus-host": "not configured",
-		"db-id":          "not configured",
-		"token":          "not configured",
+		"databasus-host":           "not configured",
+		"db-id":                    "not configured",
+		"token":                    "not configured",
+		"pg-host":                  "not configured",
+		"pg-port":                  "not configured",
+		"pg-user":                  "not configured",
+		"pg-password":              "not configured",
+		"pg-type":                  "not configured",
+		"pg-host-bin-dir":          "not configured",
+		"pg-docker-container-name": "not configured",
+		"wal-dir":                  "not configured",
+		"delete-wal-after-upload":  "not configured",
 	}
 
 	if c.DatabasusHost != "" {
@@ -94,11 +137,44 @@ func (c *Config) initSources() {
 	if c.Token != "" {
 		c.flags.sources["token"] = configFileName
 	}
+
+	if c.PgHost != "" {
+		c.flags.sources["pg-host"] = configFileName
+	}
+
+	// PgPort always has a value after applyDefaults
+	c.flags.sources["pg-port"] = configFileName
+
+	if c.PgUser != "" {
+		c.flags.sources["pg-user"] = configFileName
+	}
+
+	if c.PgPassword != "" {
+		c.flags.sources["pg-password"] = configFileName
+	}
+
+	// PgType always has a value after applyDefaults
+	c.flags.sources["pg-type"] = configFileName
+
+	if c.PgHostBinDir != "" {
+		c.flags.sources["pg-host-bin-dir"] = configFileName
+	}
+
+	if c.PgDockerContainerName != "" {
+		c.flags.sources["pg-docker-container-name"] = configFileName
+	}
+
+	if c.WalDir != "" {
+		c.flags.sources["wal-dir"] = configFileName
+	}
+
+	// IsDeleteWalAfterUpload always has a value after applyDefaults
+	c.flags.sources["delete-wal-after-upload"] = configFileName
 }
 
 func (c *Config) applyFlags() {
-	if c.flags.host != nil && *c.flags.host != "" {
-		c.DatabasusHost = *c.flags.host
+	if c.flags.databasusHost != nil && *c.flags.databasusHost != "" {
+		c.DatabasusHost = *c.flags.databasusHost
 		c.flags.sources["databasus-host"] = "command line args"
 	}
 
@@ -111,18 +187,73 @@ func (c *Config) applyFlags() {
 		c.Token = *c.flags.token
 		c.flags.sources["token"] = "command line args"
 	}
+
+	if c.flags.pgHost != nil && *c.flags.pgHost != "" {
+		c.PgHost = *c.flags.pgHost
+		c.flags.sources["pg-host"] = "command line args"
+	}
+
+	if c.flags.pgPort != nil && *c.flags.pgPort != 0 {
+		c.PgPort = *c.flags.pgPort
+		c.flags.sources["pg-port"] = "command line args"
+	}
+
+	if c.flags.pgUser != nil && *c.flags.pgUser != "" {
+		c.PgUser = *c.flags.pgUser
+		c.flags.sources["pg-user"] = "command line args"
+	}
+
+	if c.flags.pgPassword != nil && *c.flags.pgPassword != "" {
+		c.PgPassword = *c.flags.pgPassword
+		c.flags.sources["pg-password"] = "command line args"
+	}
+
+	if c.flags.pgType != nil && *c.flags.pgType != "" {
+		c.PgType = *c.flags.pgType
+		c.flags.sources["pg-type"] = "command line args"
+	}
+
+	if c.flags.pgHostBinDir != nil && *c.flags.pgHostBinDir != "" {
+		c.PgHostBinDir = *c.flags.pgHostBinDir
+		c.flags.sources["pg-host-bin-dir"] = "command line args"
+	}
+
+	if c.flags.pgDockerContainerName != nil && *c.flags.pgDockerContainerName != "" {
+		c.PgDockerContainerName = *c.flags.pgDockerContainerName
+		c.flags.sources["pg-docker-container-name"] = "command line args"
+	}
+
+	if c.flags.walDir != nil && *c.flags.walDir != "" {
+		c.WalDir = *c.flags.walDir
+		c.flags.sources["wal-dir"] = "command line args"
+	}
 }
 
 func (c *Config) logConfigSources() {
-	log.Info(
-		"databasus-host",
-		"value",
-		c.DatabasusHost,
-		"source",
-		c.flags.sources["databasus-host"],
-	)
+	log.Info("databasus-host", "value", c.DatabasusHost, "source", c.flags.sources["databasus-host"])
 	log.Info("db-id", "value", c.DbID, "source", c.flags.sources["db-id"])
 	log.Info("token", "value", maskSensitive(c.Token), "source", c.flags.sources["token"])
+	log.Info("pg-host", "value", c.PgHost, "source", c.flags.sources["pg-host"])
+	log.Info("pg-port", "value", c.PgPort, "source", c.flags.sources["pg-port"])
+	log.Info("pg-user", "value", c.PgUser, "source", c.flags.sources["pg-user"])
+	log.Info("pg-password", "value", maskSensitive(c.PgPassword), "source", c.flags.sources["pg-password"])
+	log.Info("pg-type", "value", c.PgType, "source", c.flags.sources["pg-type"])
+	log.Info("pg-host-bin-dir", "value", c.PgHostBinDir, "source", c.flags.sources["pg-host-bin-dir"])
+	log.Info(
+		"pg-docker-container-name",
+		"value",
+		c.PgDockerContainerName,
+		"source",
+		c.flags.sources["pg-docker-container-name"],
+	)
+	log.Info("wal-dir", "value", c.WalDir, "source", c.flags.sources["wal-dir"])
+	log.Info(
+		"delete-wal-after-upload",
+		"value",
+		fmt.Sprintf("%v", *c.IsDeleteWalAfterUpload),
+		"source",
+		c.flags.sources["delete-wal-after-upload"],
+	)
 }
 
 func maskSensitive(value string) string {

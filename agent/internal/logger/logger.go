@@ -32,8 +32,6 @@ func Init(isDebug bool) {
 				return a
 			},
 		}))
-
-		loggerInstance.Info("Text structured logger initialized")
 	})
 }
 
