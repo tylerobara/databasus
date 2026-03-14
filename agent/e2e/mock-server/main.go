@@ -75,7 +75,7 @@ func (s *server) handleSetVersion(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("POST /mock/set-version -> %s", body.Version)
 
-	fmt.Fprintf(w, "version set to %s", body.Version)
+	_, _ = fmt.Fprintf(w, "version set to %s", body.Version)
 }
 
 func (s *server) handleHealth(w http.ResponseWriter, _ *http.Request) {
