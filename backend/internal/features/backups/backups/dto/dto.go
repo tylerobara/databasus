@@ -44,10 +44,10 @@ type ReportErrorRequest struct {
 	Error string `json:"error" binding:"required"`
 }
 
-type UploadGapResponse struct {
-	Error               string `json:"error"`
-	ExpectedSegmentName string `json:"expectedSegmentName"`
-	ReceivedSegmentName string `json:"receivedSegmentName"`
+type IsWalChainValidResponse struct {
+	IsValid               bool   `json:"isValid"`
+	Error                 string `json:"error,omitempty"`
+	LastContiguousSegment string `json:"lastContiguousSegment,omitempty"`
 }
 
 type RestorePlanFullBackup struct {

@@ -142,46 +142,34 @@ func Test_WalUpload_Basebackup_MissingWalSegments_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func Test_WalUpload_WalSegment_NoFullBackup_Returns400(t *testing.T) {
+func Test_WalUpload_WalSegment_WithoutFullBackup_Returns204(t *testing.T) {
 	router, db, storage, agentToken, _ := createWalTestSetup(t)
 	defer removeWalTestSetup(db, storage)
 
-	// No full backup inserted — chain anchor is missing.
 	body := bytes.NewReader([]byte("wal content"))
 	req := newWalUploadRequest(body, agentToken, "wal", "000000010000000100000001", "", "")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-
-	var resp backups_dto.UploadGapResponse
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Equal(t, "no_full_backup", resp.Error)
+	assert.Equal(t, http.StatusNoContent, w.Code)
 }
 
-func Test_WalUpload_WalSegment_GapDetected_Returns409WithExpectedAndReceived(t *testing.T) {
+func Test_WalUpload_WalSegment_WithGap_Returns204(t *testing.T) {
 	router, db, storage, agentToken, _ := createWalTestSetup(t)
 	defer removeWalTestSetup(db, storage)
 
-	// Full backup stops at ...0010; upload one WAL segment at ...0011.
 	uploadBasebackup(t, router, agentToken, "000000010000000100000001", "000000010000000100000010")
 	uploadWalSegment(t, router, agentToken, "000000010000000100000011")
 
-	// Send ...0013 — should be rejected because ...0012 is missing.
+	// Skip ...0012, upload ...0013 — should succeed (no chain validation on upload).
 	body := bytes.NewReader([]byte("wal content"))
 	req := newWalUploadRequest(body, agentToken, "wal", "000000010000000100000013", "", "")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusConflict, w.Code)
-
-	var resp backups_dto.UploadGapResponse
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Equal(t, "gap_detected", resp.Error)
-	assert.Equal(t, "000000010000000100000012", resp.ExpectedSegmentName)
-	assert.Equal(t, "000000010000000100000013", resp.ReceivedSegmentName)
+	assert.Equal(t, http.StatusNoContent, w.Code)
 }
 
 func Test_WalUpload_WalSegment_DuplicateSegment_Returns200Idempotent(t *testing.T) {
@@ -253,6 +241,108 @@ func Test_WalUpload_WalSegment_ValidNextSegment_Returns200AndCreatesRecord(t *te
 	assert.Equal(t, backups_core.BackupStatusCompleted, walBackup.Status)
 	require.NotNil(t, walBackup.PgWalSegmentName)
 	assert.Equal(t, "000000010000000100000011", *walBackup.PgWalSegmentName)
+}
+
+func Test_IsWalChainValid_NoFullBackup_ReturnsFalse(t *testing.T) {
+	router, db, storage, agentToken, _ := createWalTestSetup(t)
+	defer removeWalTestSetup(db, storage)
+
+	var response backups_dto.IsWalChainValidResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t, router,
+		"/api/v1/backups/postgres/wal/is-wal-chain-valid-since-last-full-backup",
+		agentToken,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.False(t, response.IsValid)
+	assert.Equal(t, "no_full_backup", response.Error)
+}
+
+func Test_IsWalChainValid_FullBackupOnly_ReturnsTrue(t *testing.T) {
+	router, db, storage, agentToken, _ := createWalTestSetup(t)
+	defer removeWalTestSetup(db, storage)
+
+	uploadBasebackup(t, router, agentToken, "000000010000000100000001", "000000010000000100000010")
+
+	var response backups_dto.IsWalChainValidResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t, router,
+		"/api/v1/backups/postgres/wal/is-wal-chain-valid-since-last-full-backup",
+		agentToken,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.True(t, response.IsValid)
+	assert.Empty(t, response.Error)
+}
+
+func Test_IsWalChainValid_ContinuousChain_ReturnsTrue(t *testing.T) {
+	router, db, storage, agentToken, _ := createWalTestSetup(t)
+	defer removeWalTestSetup(db, storage)
+
+	uploadBasebackup(t, router, agentToken, "000000010000000100000001", "000000010000000100000010")
+	uploadWalSegment(t, router, agentToken, "000000010000000100000011")
+	uploadWalSegment(t, router, agentToken, "000000010000000100000012")
+	uploadWalSegment(t, router, agentToken, "000000010000000100000013")
+
+	var response backups_dto.IsWalChainValidResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t, router,
+		"/api/v1/backups/postgres/wal/is-wal-chain-valid-since-last-full-backup",
+		agentToken,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.True(t, response.IsValid)
+}
+
+func Test_IsWalChainValid_BrokenChain_ReturnsFalse(t *testing.T) {
+	router, db, storage, agentToken, _ := createWalTestSetup(t)
+	defer removeWalTestSetup(db, storage)
+
+	uploadBasebackup(t, router, agentToken, "000000010000000100000001", "000000010000000100000010")
+	uploadWalSegment(t, router, agentToken, "000000010000000100000011")
+	uploadWalSegment(t, router, agentToken, "000000010000000100000012")
+	uploadWalSegment(t, router, agentToken, "000000010000000100000013")
+
+	// Delete the middle segment to create a gap.
+	middleSeg, err := backups_core.GetBackupRepository().FindWalSegmentByName(
+		db.ID, "000000010000000100000012",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, middleSeg)
+	require.NoError(t, backups_core.GetBackupRepository().DeleteByID(middleSeg.ID))
+
+	var response backups_dto.IsWalChainValidResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t, router,
+		"/api/v1/backups/postgres/wal/is-wal-chain-valid-since-last-full-backup",
+		agentToken,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.False(t, response.IsValid)
+	assert.Equal(t, "wal_chain_broken", response.Error)
+	assert.Equal(t, "000000010000000100000011", response.LastContiguousSegment)
+}
+
+func Test_IsWalChainValid_InvalidToken_Returns401(t *testing.T) {
+	router, db, storage, _, _ := createWalTestSetup(t)
+	defer removeWalTestSetup(db, storage)
+
+	resp := test_utils.MakeGetRequest(
+		t, router,
+		"/api/v1/backups/postgres/wal/is-wal-chain-valid-since-last-full-backup",
+		"invalid-token",
+		http.StatusUnauthorized,
+	)
+
+	assert.Contains(t, string(resp.Body), "invalid agent token")
 }
 
 func Test_ReportError_ValidTokenAndError_CreatesFailedBackupRecord(t *testing.T) {
