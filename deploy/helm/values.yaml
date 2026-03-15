@@ -17,10 +17,10 @@ service:
   type: ClusterIP
   port: 4005          # Service port
   targetPort: 4005    # Internal container port
+  annotations: {}
   # Headless service for StatefulSet
   headless:
     enabled: true
-
 # Resource limits and requests
 resources:
   requests:
