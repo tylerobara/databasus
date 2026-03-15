@@ -5,14 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"databasus-agent/internal/config"
+	"databasus-agent/internal/features/wal"
 )
 
 const (
@@ -39,10 +43,13 @@ func Run(cfg *config.Config, log *slog.Logger) error {
 		return err
 	}
 
-	log.Info("start: stub — not yet implemented",
-		"dbId", cfg.DbID,
-		"hasToken", cfg.Token != "",
-	)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	streamer := wal.NewStreamer(cfg, log)
+	streamer.Run(ctx)
+
+	log.Info("Agent stopped")
 
 	return nil
 }

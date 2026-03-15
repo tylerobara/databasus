@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/jackc/pgx/v5 v5.8.0
+	github.com/klauspost/compress v1.18.4
 	github.com/stretchr/testify v1.11.1
 )
 
