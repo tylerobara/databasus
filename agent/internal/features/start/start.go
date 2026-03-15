@@ -66,6 +66,12 @@ func RunDaemon(cfg *config.Config, log *slog.Logger) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	watcher, err := NewLockWatcher(lockFile, cancel, log)
+	if err != nil {
+		return fmt.Errorf("failed to initialize lock watcher: %w", err)
+	}
+	go watcher.Run(ctx)
+
 	apiClient := api.NewClient(cfg.DatabasusHost, cfg.Token, log)
 
 	fullBackuper := full_backup.NewFullBackuper(cfg, apiClient, log)
