@@ -3,6 +3,7 @@
 package start
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -93,7 +94,7 @@ func spawnDaemon(log *slog.Logger) (int, error) {
 		return 0, fmt.Errorf("failed to get working directory: %w", err)
 	}
 
-	cmd := exec.Command(execPath, args...)
+	cmd := exec.CommandContext(context.Background(), execPath, args...)
 	cmd.Dir = cwd
 	cmd.Stderr = logFile
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

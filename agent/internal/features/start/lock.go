@@ -42,10 +42,10 @@ func AcquireLock(log *slog.Logger) (*os.File, error) {
 	_ = f.Close()
 
 	if pidErr != nil {
-		return nil, fmt.Errorf("Another instance is already running.")
+		return nil, fmt.Errorf("another instance is already running")
 	}
 
-	return nil, fmt.Errorf("Another instance is already running (PID %d).", pid)
+	return nil, fmt.Errorf("another instance is already running (PID %d)", pid)
 }
 
 func ReleaseLock(f *os.File) {
@@ -59,7 +59,7 @@ func ReadLockFilePID() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return readLockPID(f)
 }
