@@ -27,11 +27,12 @@ run_test() {
 if [ "$MODE" = "host" ]; then
   run_test "Test 1: Upgrade success (v1 -> v2)" "$SCRIPT_DIR/test-upgrade-success.sh"
   run_test "Test 2: Upgrade skip (version matches)" "$SCRIPT_DIR/test-upgrade-skip.sh"
-  run_test "Test 3: pg_basebackup in PATH" "$SCRIPT_DIR/test-pg-host-path.sh"
-  run_test "Test 4: pg_basebackup via bindir" "$SCRIPT_DIR/test-pg-host-bindir.sh"
+  run_test "Test 3: Background upgrade (v1 -> v2 while running)" "$SCRIPT_DIR/test-upgrade-background.sh"
+  run_test "Test 4: pg_basebackup in PATH" "$SCRIPT_DIR/test-pg-host-path.sh"
+  run_test "Test 5: pg_basebackup via bindir" "$SCRIPT_DIR/test-pg-host-bindir.sh"
 
 elif [ "$MODE" = "docker" ]; then
-  run_test "Test 5: pg_basebackup via docker exec" "$SCRIPT_DIR/test-pg-docker-exec.sh"
+  run_test "Test 6: pg_basebackup via docker exec" "$SCRIPT_DIR/test-pg-docker-exec.sh"
 
 else
   echo "Unknown mode: $MODE (expected 'host' or 'docker')"

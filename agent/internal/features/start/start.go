@@ -20,6 +20,7 @@ import (
 	"databasus-agent/internal/config"
 	"databasus-agent/internal/features/api"
 	full_backup "databasus-agent/internal/features/full_backup"
+	"databasus-agent/internal/features/upgrade"
 	"databasus-agent/internal/features/wal"
 )
 
@@ -29,7 +30,7 @@ const (
 	minPgMajorVersion         = 15
 )
 
-func Start(cfg *config.Config, log *slog.Logger) error {
+func Start(cfg *config.Config, agentVersion string, isDev bool, log *slog.Logger) error {
 	if err := validateConfig(cfg); err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func Start(cfg *config.Config, log *slog.Logger) error {
 	}
 
 	if runtime.GOOS == "windows" {
-		return RunDaemon(cfg, log)
+		return RunDaemon(cfg, agentVersion, isDev, log)
 	}
 
 	pid, err := spawnDaemon(log)
@@ -56,7 +57,7 @@ func Start(cfg *config.Config, log *slog.Logger) error {
 	return nil
 }
 
-func RunDaemon(cfg *config.Config, log *slog.Logger) error {
+func RunDaemon(cfg *config.Config, agentVersion string, isDev bool, log *slog.Logger) error {
 	lockFile, err := AcquireLock(log)
 	if err != nil {
 		return err
@@ -74,11 +75,25 @@ func RunDaemon(cfg *config.Config, log *slog.Logger) error {
 
 	apiClient := api.NewClient(cfg.DatabasusHost, cfg.Token, log)
 
+	var backgroundUpgrader *upgrade.BackgroundUpgrader
+	if agentVersion != "dev" && runtime.GOOS != "windows" {
+		backgroundUpgrader = upgrade.NewBackgroundUpgrader(apiClient, agentVersion, isDev, cancel, log)
+		go backgroundUpgrader.Run(ctx)
+	}
+
 	fullBackuper := full_backup.NewFullBackuper(cfg, apiClient, log)
 	go fullBackuper.Run(ctx)
 
 	streamer := wal.NewStreamer(cfg, apiClient, log)
 	streamer.Run(ctx)
+
+	if backgroundUpgrader != nil {
+		backgroundUpgrader.WaitForCompletion(30 * time.Second)
+
+		if backgroundUpgrader.IsUpgraded() {
+			return upgrade.ErrUpgradeRestart
+		}
+	}
 
 	log.Info("Agent stopped")
 

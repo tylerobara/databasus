@@ -5,6 +5,16 @@ ARTIFACTS="/opt/agent/artifacts"
 AGENT="/tmp/test-agent"
 CUSTOM_BIN_DIR="/opt/pg/bin"
 
+# Cleanup from previous runs
+pkill -f "test-agent" 2>/dev/null || true
+for i in $(seq 1 20); do
+  pgrep -f "test-agent" > /dev/null 2>&1 || break
+  sleep 0.5
+done
+pkill -9 -f "test-agent" 2>/dev/null || true
+sleep 0.5
+rm -f "$AGENT" "$AGENT.update" databasus.lock databasus.log databasus.log.old databasus.json 2>/dev/null || true
+
 # Copy agent binary
 cp "$ARTIFACTS/agent-v1" "$AGENT"
 chmod +x "$AGENT"
@@ -32,7 +42,7 @@ OUTPUT=$("$AGENT" start \
   --pg-port 5432 \
   --pg-user testuser \
   --pg-password testpassword \
-  --wal-dir /tmp/wal \
+  --pg-wal-dir /tmp/wal \
   --pg-type host \
   --pg-host-bin-dir "$CUSTOM_BIN_DIR" 2>&1)
 

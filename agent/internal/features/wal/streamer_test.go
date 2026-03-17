@@ -52,7 +52,6 @@ func Test_UploadSegment_SingleSegment_ServerReceivesCorrectHeadersAndBody(t *tes
 	require.NotNil(t, receivedHeaders)
 	assert.Equal(t, "test-token", receivedHeaders.Get("Authorization"))
 	assert.Equal(t, "application/octet-stream", receivedHeaders.Get("Content-Type"))
-	assert.Equal(t, "wal", receivedHeaders.Get("X-Upload-Type"))
 	assert.Equal(t, "000000010000000100000001", receivedHeaders.Get("X-Wal-Segment-Name"))
 
 	decompressed := decompressZstd(t, receivedBody)

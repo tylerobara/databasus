@@ -95,7 +95,6 @@ func spawnDaemon(log *slog.Logger) (int, error) {
 
 	cmd := exec.Command(execPath, args...)
 	cmd.Dir = cwd
-	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 

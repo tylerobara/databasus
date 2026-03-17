@@ -374,7 +374,7 @@ func Test_RunFullBackup_WhenStderrParsingFails_FinalizesWithErrorAndRetries(t *t
 	var mu sync.Mutex
 	var errorReported bool
 	var finalizeWithErrorReceived bool
-	var finalizeBody map[string]interface{}
+	var finalizeBody map[string]any
 
 	server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

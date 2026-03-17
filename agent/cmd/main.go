@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"databasus-agent/internal/config"
 	"databasus-agent/internal/features/api"
@@ -60,7 +62,11 @@ func runStart(args []string) {
 	isDev := checkIsDevelopment()
 	runUpdateCheck(cfg.DatabasusHost, *isSkipUpdate, isDev, log)
 
-	if err := start.Start(cfg, log); err != nil {
+	if err := start.Start(cfg, Version, isDev, log); err != nil {
+		if errors.Is(err, upgrade.ErrUpgradeRestart) {
+			reexecAfterUpgrade(log)
+		}
+
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -78,7 +84,11 @@ func runDaemon(args []string) {
 	cfg := &config.Config{}
 	cfg.LoadFromJSON()
 
-	if err := start.RunDaemon(cfg, log); err != nil {
+	if err := start.RunDaemon(cfg, Version, checkIsDevelopment(), log); err != nil {
+		if errors.Is(err, upgrade.ErrUpgradeRestart) {
+			reexecAfterUpgrade(log)
+		}
+
 		log.Error("Agent exited with error", "error", err)
 		os.Exit(1)
 	}
@@ -153,9 +163,14 @@ func runUpdateCheck(host string, isSkipUpdate, isDev bool, log *slog.Logger) {
 
 	apiClient := api.NewClient(host, "", log)
 
-	if err := upgrade.CheckAndUpdate(apiClient, Version, isDev, log); err != nil {
+	isUpgraded, err := upgrade.CheckAndUpdate(apiClient, Version, isDev, log)
+	if err != nil {
 		log.Error("Auto-update failed", "error", err)
 		os.Exit(1)
+	}
+
+	if isUpgraded {
+		reexecAfterUpgrade(log)
 	}
 }
 
@@ -194,4 +209,19 @@ func parseEnvMode(data []byte) bool {
 	}
 
 	return false
+}
+
+func reexecAfterUpgrade(log *slog.Logger) {
+	selfPath, err := os.Executable()
+	if err != nil {
+		log.Error("Failed to resolve executable for re-exec", "error", err)
+		os.Exit(1)
+	}
+
+	log.Info("Re-executing after upgrade...")
+
+	if err := syscall.Exec(selfPath, os.Args, os.Environ()); err != nil {
+		log.Error("Failed to re-exec after upgrade", "error", err)
+		os.Exit(1)
+	}
 }

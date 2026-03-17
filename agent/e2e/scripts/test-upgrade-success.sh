@@ -4,10 +4,24 @@ set -euo pipefail
 ARTIFACTS="/opt/agent/artifacts"
 AGENT="/tmp/test-agent"
 
-# Ensure mock server returns v2.0.0
+# Cleanup from previous runs
+pkill -f "test-agent" 2>/dev/null || true
+for i in $(seq 1 20); do
+  pgrep -f "test-agent" > /dev/null 2>&1 || break
+  sleep 0.5
+done
+pkill -9 -f "test-agent" 2>/dev/null || true
+sleep 0.5
+rm -f "$AGENT" "$AGENT.update" databasus.lock databasus.log databasus.log.old databasus.json 2>/dev/null || true
+
+# Ensure mock server returns v2.0.0 and serves v2 binary
 curl -sf -X POST http://e2e-mock-server:4050/mock/set-version \
   -H "Content-Type: application/json" \
   -d '{"version":"v2.0.0"}'
+
+curl -sf -X POST http://e2e-mock-server:4050/mock/set-binary-path \
+  -H "Content-Type: application/json" \
+  -d '{"binaryPath":"/artifacts/agent-v2"}'
 
 # Copy v1 binary to writable location
 cp "$ARTIFACTS/agent-v1" "$AGENT"
@@ -37,7 +51,7 @@ OUTPUT=$("$AGENT" start \
   --pg-port 5432 \
   --pg-user testuser \
   --pg-password testpassword \
-  --wal-dir /tmp/wal \
+  --pg-wal-dir /tmp/wal \
   --pg-type host 2>&1) || true
 
 echo "$OUTPUT"
