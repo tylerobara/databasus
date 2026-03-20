@@ -144,6 +144,11 @@ func runRestore(args []string) {
 		os.Exit(1)
 	}
 
+	if cfg.PgType != "host" && cfg.PgType != "docker" {
+		fmt.Fprintf(os.Stderr, "Error: --pg-type must be 'host' or 'docker', got '%s'\n", cfg.PgType)
+		os.Exit(1)
+	}
+
 	apiClient := api.NewClient(cfg.DatabasusHost, cfg.Token, log)
 	restorer := restore.NewRestorer(apiClient, log, *pgDataDir, *backupID, *targetTime, cfg.PgType)
 
