@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	pollInterval  = 2 * time.Second
+	pollInterval  = 10 * time.Second
 	uploadTimeout = 5 * time.Minute
 )
 
@@ -64,6 +64,13 @@ func (s *Streamer) processQueue(ctx context.Context) {
 		s.log.Error("Failed to list WAL segments", "error", err)
 		return
 	}
+
+	if len(segments) == 0 {
+		s.log.Info("No WAL segments pending", "dir", s.cfg.PgWalDir)
+		return
+	}
+
+	s.log.Info("WAL segments pending upload", "dir", s.cfg.PgWalDir, "count", len(segments))
 
 	for _, segmentName := range segments {
 		if ctx.Err() != nil {
@@ -121,6 +128,8 @@ func (s *Streamer) uploadSegment(ctx context.Context, segmentName string) error 
 	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
 	defer cancel()
 
+	s.log.Info("Uploading WAL segment", "segment", segmentName)
+
 	result, err := s.apiClient.UploadWalSegment(uploadCtx, segmentName, pr)
 	if err != nil {
 		return err
@@ -136,7 +145,7 @@ func (s *Streamer) uploadSegment(ctx context.Context, segmentName string) error 
 		return fmt.Errorf("gap detected for segment %s", segmentName)
 	}
 
-	s.log.Debug("WAL segment uploaded", "segment", segmentName)
+	s.log.Info("WAL segment uploaded", "segment", segmentName)
 
 	if *s.cfg.IsDeleteWalAfterUpload {
 		if err := os.Remove(filePath); err != nil {
