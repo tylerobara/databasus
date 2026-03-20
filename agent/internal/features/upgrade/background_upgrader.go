@@ -9,7 +9,7 @@ import (
 	"databasus-agent/internal/features/api"
 )
 
-const backgroundCheckInterval = 5 * time.Second
+const backgroundCheckInterval = 10 * time.Second
 
 type BackgroundUpgrader struct {
 	apiClient      *api.Client
