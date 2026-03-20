@@ -117,7 +117,7 @@ func runStatus() {
 func runRestore(args []string) {
 	fs := flag.NewFlagSet("restore", flag.ExitOnError)
 
-	pgDataDir := fs.String("pgdata", "", "Target pgdata directory (required)")
+	pgDataDir := fs.String("target-dir", "", "Target pgdata directory (required)")
 	backupID := fs.String("backup-id", "", "Full backup UUID (optional)")
 	targetTime := fs.String("target-time", "", "PITR target time in RFC3339 (optional)")
 	isSkipUpdate := fs.Bool("skip-update", false, "Skip auto-update check")
@@ -135,7 +135,7 @@ func runRestore(args []string) {
 	runUpdateCheck(cfg.DatabasusHost, *isSkipUpdate, isDev, log)
 
 	if *pgDataDir == "" {
-		fmt.Fprintln(os.Stderr, "Error: --pgdata is required")
+		fmt.Fprintln(os.Stderr, "Error: --target-dir is required")
 		os.Exit(1)
 	}
 

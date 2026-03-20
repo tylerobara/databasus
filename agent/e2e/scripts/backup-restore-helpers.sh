@@ -236,7 +236,7 @@ run_agent_restore() {
     --skip-update \
     --databasus-host "$mock_server" \
     --token test-token \
-    --pgdata "$restore_dir"
+    --target-dir "$restore_dir"
 
   echo "Agent restore completed"
 }
