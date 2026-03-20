@@ -207,7 +207,30 @@ volumes:
 
       <div>
         <div className="font-semibold dark:text-white">
-          Step {isDocker ? '5' : '4'} — Start PostgreSQL
+          Step {isDocker ? '5' : '4'} — Handle archive_command
+        </div>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          The restored backup includes the original <code>archive_command</code> configuration.
+          PostgreSQL will fail to archive WAL files after recovery unless you either:
+        </p>
+        <ul className="mt-1 list-disc pl-5 text-sm text-gray-600 dark:text-gray-400">
+          <li>
+            <strong>Re-attach the agent</strong> — mount the WAL queue directory and start the
+            databasus agent on the restored instance, same as the original setup.
+          </li>
+          <li>
+            <strong>Disable archiving</strong> — if you don&apos;t need continuous backups yet,
+            comment out or reset the archive settings in <code>postgresql.auto.conf</code>:
+          </li>
+        </ul>
+        {renderCodeBlock(`# In ${targetDirPlaceholder}/postgresql.auto.conf, remove or comment out:
+# archive_mode = on
+# archive_command = '...'`)}
+      </div>
+
+      <div>
+        <div className="font-semibold dark:text-white">
+          Step {isDocker ? '6' : '5'} — Start PostgreSQL
         </div>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Start PostgreSQL to begin WAL recovery. It will automatically replay WAL segments.
@@ -218,7 +241,7 @@ volumes:
       </div>
 
       <div>
-        <div className="font-semibold dark:text-white">Step {isDocker ? '6' : '5'} — Clean up</div>
+        <div className="font-semibold dark:text-white">Step {isDocker ? '7' : '6'} — Clean up</div>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           After recovery completes, remove the WAL restore directory:
         </p>
