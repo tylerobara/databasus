@@ -59,3 +59,6 @@ if [ "$VERSION" != "v1.0.0" ]; then
 fi
 
 echo "Upgrade correctly skipped, version still $VERSION"
+
+# Cleanup daemon
+"$AGENT" stop || true

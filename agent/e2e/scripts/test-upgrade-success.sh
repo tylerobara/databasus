@@ -64,3 +64,6 @@ if [ "$VERSION" != "v2.0.0" ]; then
 fi
 
 echo "Binary upgraded successfully to $VERSION"
+
+# Cleanup daemon
+"$AGENT" stop || true

@@ -50,8 +50,23 @@ func AcquireLock(log *slog.Logger) (*os.File, error) {
 
 func ReleaseLock(f *os.File) {
 	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+
+	lockedStat, lockedErr := f.Stat()
 	_ = f.Close()
-	_ = os.Remove(lockFileName)
+
+	if lockedErr != nil {
+		_ = os.Remove(lockFileName)
+		return
+	}
+
+	diskStat, diskErr := os.Stat(lockFileName)
+	if diskErr != nil {
+		return
+	}
+
+	if os.SameFile(lockedStat, diskStat) {
+		_ = os.Remove(lockFileName)
+	}
 }
 
 func ReadLockFilePID() (int, error) {

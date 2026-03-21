@@ -5,6 +5,7 @@ MODE="${1:-host}"
 SCRIPT_DIR="$(dirname "$0")"
 PASSED=0
 FAILED=0
+FAILED_NAMES=""
 
 run_test() {
   local name="$1"
@@ -21,6 +22,7 @@ run_test() {
   else
     echo "  FAILED: $name"
     FAILED=$((FAILED + 1))
+    FAILED_NAMES="${FAILED_NAMES}\n    - ${name}"
   fi
 }
 
@@ -42,6 +44,11 @@ fi
 echo ""
 echo "========================================"
 echo "  Results: $PASSED passed, $FAILED failed"
+if [ "$FAILED" -gt 0 ]; then
+  echo ""
+  echo "  Failed:"
+  echo -e "$FAILED_NAMES"
+fi
 echo "========================================"
 
 if [ "$FAILED" -gt 0 ]; then
