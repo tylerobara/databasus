@@ -304,9 +304,6 @@ jobs:
           TEST_MARIADB_114_PORT=33114
           TEST_MARIADB_118_PORT=33118
           TEST_MARIADB_120_PORT=33120
-          # testing Telegram
-          TEST_TELEGRAM_BOT_TOKEN=${{ secrets.TEST_TELEGRAM_BOT_TOKEN }}
-          TEST_TELEGRAM_CHAT_ID=${{ secrets.TEST_TELEGRAM_CHAT_ID }}
           # supabase
           TEST_SUPABASE_HOST=${{ secrets.TEST_SUPABASE_HOST }}
           TEST_SUPABASE_PORT=${{ secrets.TEST_SUPABASE_PORT }}

@@ -109,10 +109,6 @@ type EnvVariables struct {
 	CloudflareTurnstileSecretKey string `env:"CLOUDFLARE_TURNSTILE_SECRET_KEY"`
 	CloudflareTurnstileSiteKey   string `env:"CLOUDFLARE_TURNSTILE_SITE_KEY"`
 
-	// testing Telegram
-	TestTelegramBotToken string `env:"TEST_TELEGRAM_BOT_TOKEN"`
-	TestTelegramChatID   string `env:"TEST_TELEGRAM_CHAT_ID"`
-
 	// testing Supabase
 	TestSupabaseHost     string `env:"TEST_SUPABASE_HOST"`
 	TestSupabasePort     string `env:"TEST_SUPABASE_PORT"`
@@ -365,15 +361,6 @@ func loadEnvVariables() {
 			os.Exit(1)
 		}
 
-		if env.TestTelegramBotToken == "" {
-			log.Error("TEST_TELEGRAM_BOT_TOKEN is empty")
-			os.Exit(1)
-		}
-
-		if env.TestTelegramChatID == "" {
-			log.Error("TEST_TELEGRAM_CHAT_ID is empty")
-			os.Exit(1)
-		}
 	}
 
 	log.Info("Environment variables loaded successfully!")

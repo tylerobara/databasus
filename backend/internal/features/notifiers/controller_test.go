@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"databasus-backend/internal/config"
 	audit_logs "databasus-backend/internal/features/audit_logs"
 	discord_notifier "databasus-backend/internal/features/notifiers/models/discord"
 	email_notifier "databasus-backend/internal/features/notifiers/models/email_notifier"
@@ -159,7 +158,7 @@ func Test_SendTestNotificationDirect_NotificationSent(t *testing.T) {
 	router := createRouter()
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
 
-	notifier := createTelegramNotifier(workspace.ID)
+	notifier := createWebhookNotifier(workspace.ID)
 
 	response := test_utils.MakePostRequest(
 		t, router, "/api/v1/notifiers/direct-test", "Bearer "+owner.Token, *notifier, http.StatusOK,
@@ -174,7 +173,7 @@ func Test_SendTestNotificationExisting_NotificationSent(t *testing.T) {
 	router := createRouter()
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
 
-	notifier := createTelegramNotifier(workspace.ID)
+	notifier := createWebhookNotifier(workspace.ID)
 
 	var savedNotifier Notifier
 	test_utils.MakePostRequestAndUnmarshal(
@@ -1252,15 +1251,14 @@ func createNewNotifier(workspaceID uuid.UUID) *Notifier {
 	}
 }
 
-func createTelegramNotifier(workspaceID uuid.UUID) *Notifier {
-	env := config.GetEnv()
+func createWebhookNotifier(workspaceID uuid.UUID) *Notifier {
 	return &Notifier{
 		WorkspaceID:  workspaceID,
-		Name:         "Test Telegram Notifier " + uuid.New().String(),
-		NotifierType: NotifierTypeTelegram,
-		TelegramNotifier: &telegram_notifier.TelegramNotifier{
-			BotToken:     env.TestTelegramBotToken,
-			TargetChatID: env.TestTelegramChatID,
+		Name:         "Test Webhook Notifier " + uuid.New().String(),
+		NotifierType: NotifierTypeWebhook,
+		WebhookNotifier: &webhook_notifier.WebhookNotifier{
+			WebhookURL:    "https://databasus.com",
+			WebhookMethod: webhook_notifier.WebhookMethodGET,
 		},
 	}
 }
