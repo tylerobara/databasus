@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 
 import { IS_CLOUD } from '../constants';
 import { userApi } from '../entity/users';
-import { PlaygroundWarningComponent } from '../features/playground';
 import {
   AdminPasswordComponent,
   AuthNavbarComponent,
@@ -110,8 +109,6 @@ export function AuthPageComponent() {
           info@databasus.com | &copy; 2026 Databasus. All rights reserved.
         </footer>
       )}
-
-      <PlaygroundWarningComponent />
     </div>
   );
 }

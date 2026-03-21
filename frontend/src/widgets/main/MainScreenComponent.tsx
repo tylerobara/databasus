@@ -14,7 +14,6 @@ import {
 import { type WorkspaceResponse, workspaceApi } from '../../entity/workspaces';
 import { DatabasesComponent } from '../../features/databases/ui/DatabasesComponent';
 import { NotifiersComponent } from '../../features/notifiers/ui/NotifiersComponent';
-import { PlaygroundWarningComponent } from '../../features/playground';
 import { SettingsComponent } from '../../features/settings';
 import { StoragesComponent } from '../../features/storages/ui/StoragesComponent';
 import { ProfileComponent } from '../../features/users';
@@ -381,8 +380,6 @@ export const MainScreenComponent = () => {
           workspacesCount={workspaces.length}
         />
       )}
-
-      <PlaygroundWarningComponent />
     </div>
   );
 };
