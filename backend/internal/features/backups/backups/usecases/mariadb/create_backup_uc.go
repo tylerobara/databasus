@@ -109,6 +109,7 @@ func (uc *CreateMariadbBackupUsecase) buildMariadbDumpArgs(
 		"--routines",
 		"--quick",
 		"--skip-extended-insert",
+		"--skip-add-locks",
 		"--verbose",
 	}
 
