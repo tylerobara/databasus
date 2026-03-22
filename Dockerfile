@@ -341,7 +341,7 @@ if [ "\${IS_CLOUD:-false}" = "true" ]; then
         close \$fh;
         \$c =~ s/\\n/ /g;
       }
-      s/<div id="root"><\\/div>/<div id="root"><!-- cloud-static-content -->\$c<\\/div>/
+      s/<div id="root"><\\/div>/<div id="root"><!-- cloud-static-content --><noscript>\$c<\\/noscript><\\/div>/
     ' /app/ui/build/index.html
   fi
 fi
