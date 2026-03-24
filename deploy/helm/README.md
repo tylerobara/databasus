@@ -30,6 +30,7 @@ Then open `http://localhost:4005` in your browser.
 | `image.repository` | Docker image       | `databasus/databasus` |
 | `image.tag`        | Image tag          | `latest`                    |
 | `image.pullPolicy` | Image pull policy  | `Always`                    |
+| `imagePullSecrets` | Image pull secrets | `[]`                        |
 | `replicaCount`     | Number of replicas | `1`                         |
 
 ### Custom Root CA

@@ -6,6 +6,8 @@ image:
   tag: null
   pullPolicy: Always
 
+imagePullSecrets: []
+
 # StatefulSet configuration
 replicaCount: 1
 
@@ -15,8 +17,8 @@ customRootCA: ""
 # Service configuration
 service:
   type: ClusterIP
-  port: 4005          # Service port
-  targetPort: 4005    # Internal container port
+  port: 4005 # Service port
+  targetPort: 4005 # Internal container port
   annotations: {}
   # Headless service for StatefulSet
   headless:
@@ -60,7 +62,7 @@ route:
   kind: HTTPRoute
   annotations: {}
   hostnames:
-  - databasus.example.com
+    - databasus.example.com
   parentRefs: []
   filters: []
   matches: []
