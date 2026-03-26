@@ -2,6 +2,7 @@ import { CloseOutlined } from '@ant-design/icons';
 import { Drawer, Tooltip } from 'antd';
 import { useEffect } from 'react';
 
+import { IS_CLOUD } from '../../constants';
 import { type DiskUsage } from '../../entity/disk';
 import { type UserProfile, UserRole } from '../../entity/users';
 import { useIsMobile } from '../../shared/hooks';
@@ -202,6 +203,17 @@ export const SidebarComponent = ({
             >
               Community
             </a>
+
+            {!IS_CLOUD && (
+              <a
+                className="block rounded text-sm font-medium !text-gray-700 hover:bg-gray-100 hover:!text-blue-600 dark:!text-gray-300 dark:hover:bg-gray-700"
+                href="https://databasus.com/cloud"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Cloud (from $9)
+              </a>
+            )}
 
             <div className="flex pt-2">
               <StarButtonComponent />

@@ -425,7 +425,7 @@ func Test_CleanByGFS_KeepsCorrectBackupsPerSlot(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -502,7 +502,7 @@ func Test_CleanByGFS_WithWeeklyAndMonthlySlots_KeepsWiderSpread(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -576,7 +576,7 @@ func Test_CleanByGFS_WithHourlySlots_KeepsCorrectBackups(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -677,7 +677,7 @@ func Test_CleanByGFS_SkipsRecentBackup_WhenNotInKeepSet(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -759,7 +759,7 @@ func Test_CleanByGFS_With20DailyBackups_KeepsOnlyExpectedCount(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -844,7 +844,7 @@ func Test_CleanByGFS_WithMultipleBackupsPerDay_KeepsOnlyOnePerDailySlot(t *testi
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -929,7 +929,7 @@ func Test_CleanByGFS_With24HourlySlotsAnd23DailyBackups_DeletesExcessBackups(t *
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -999,7 +999,7 @@ func Test_CleanByGFS_WithDisabledHourlySlotsAnd23DailyBackups_DeletesExcessBacku
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -1069,7 +1069,7 @@ func Test_CleanByGFS_WithDailySlotsAndWeeklyBackups_DeletesExcessBackups(t *test
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -1152,7 +1152,7 @@ func Test_CleanByGFS_WithWeeklySlotsAndMonthlyBackups_DeletesExcessBackups(t *te
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)

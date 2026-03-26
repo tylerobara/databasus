@@ -9,7 +9,6 @@ import (
 
 	"databasus-backend/internal/config"
 	"databasus-backend/internal/features/intervals"
-	plans "databasus-backend/internal/features/plan"
 	"databasus-backend/internal/features/storages"
 	"databasus-backend/internal/util/period"
 )
@@ -42,11 +41,6 @@ type BackupConfig struct {
 	MaxFailedTriesCount int  `json:"maxFailedTriesCount" gorm:"column:max_failed_tries_count;type:int;not null"`
 
 	Encryption BackupEncryption `json:"encryption" gorm:"column:encryption;type:text;not null;default:'NONE'"`
-
-	// MaxBackupSizeMB limits individual backup size. 0 = unlimited.
-	MaxBackupSizeMB int64 `json:"maxBackupSizeMb" gorm:"column:max_backup_size_mb;type:int;not null"`
-	// MaxBackupsTotalSizeMB limits total size of all backups. 0 = unlimited.
-	MaxBackupsTotalSizeMB int64 `json:"maxBackupsTotalSizeMb" gorm:"column:max_backups_total_size_mb;type:int;not null"`
 }
 
 func (h *BackupConfig) TableName() string {
@@ -86,12 +80,12 @@ func (b *BackupConfig) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
-func (b *BackupConfig) Validate(plan *plans.DatabasePlan) error {
+func (b *BackupConfig) Validate() error {
 	if b.BackupIntervalID == uuid.Nil && b.BackupInterval == nil {
 		return errors.New("backup interval is required")
 	}
 
-	if err := b.validateRetentionPolicy(plan); err != nil {
+	if err := b.validateRetentionPolicy(); err != nil {
 		return err
 	}
 
@@ -110,65 +104,36 @@ func (b *BackupConfig) Validate(plan *plans.DatabasePlan) error {
 		}
 	}
 
-	if b.MaxBackupSizeMB < 0 {
-		return errors.New("max backup size must be non-negative")
-	}
-
-	if b.MaxBackupsTotalSizeMB < 0 {
-		return errors.New("max backups total size must be non-negative")
-	}
-
-	if plan.MaxBackupSizeMB > 0 {
-		if b.MaxBackupSizeMB == 0 || b.MaxBackupSizeMB > plan.MaxBackupSizeMB {
-			return errors.New("max backup size exceeds plan limit")
-		}
-	}
-
-	if plan.MaxBackupsTotalSizeMB > 0 {
-		if b.MaxBackupsTotalSizeMB == 0 ||
-			b.MaxBackupsTotalSizeMB > plan.MaxBackupsTotalSizeMB {
-			return errors.New("max total backups size exceeds plan limit")
-		}
-	}
-
 	return nil
 }
 
 func (b *BackupConfig) Copy(newDatabaseID uuid.UUID) *BackupConfig {
 	return &BackupConfig{
-		DatabaseID:            newDatabaseID,
-		IsBackupsEnabled:      b.IsBackupsEnabled,
-		RetentionPolicyType:   b.RetentionPolicyType,
-		RetentionTimePeriod:   b.RetentionTimePeriod,
-		RetentionCount:        b.RetentionCount,
-		RetentionGfsHours:     b.RetentionGfsHours,
-		RetentionGfsDays:      b.RetentionGfsDays,
-		RetentionGfsWeeks:     b.RetentionGfsWeeks,
-		RetentionGfsMonths:    b.RetentionGfsMonths,
-		RetentionGfsYears:     b.RetentionGfsYears,
-		BackupIntervalID:      uuid.Nil,
-		BackupInterval:        b.BackupInterval.Copy(),
-		StorageID:             b.StorageID,
-		SendNotificationsOn:   b.SendNotificationsOn,
-		IsRetryIfFailed:       b.IsRetryIfFailed,
-		MaxFailedTriesCount:   b.MaxFailedTriesCount,
-		Encryption:            b.Encryption,
-		MaxBackupSizeMB:       b.MaxBackupSizeMB,
-		MaxBackupsTotalSizeMB: b.MaxBackupsTotalSizeMB,
+		DatabaseID:          newDatabaseID,
+		IsBackupsEnabled:    b.IsBackupsEnabled,
+		RetentionPolicyType: b.RetentionPolicyType,
+		RetentionTimePeriod: b.RetentionTimePeriod,
+		RetentionCount:      b.RetentionCount,
+		RetentionGfsHours:   b.RetentionGfsHours,
+		RetentionGfsDays:    b.RetentionGfsDays,
+		RetentionGfsWeeks:   b.RetentionGfsWeeks,
+		RetentionGfsMonths:  b.RetentionGfsMonths,
+		RetentionGfsYears:   b.RetentionGfsYears,
+		BackupIntervalID:    uuid.Nil,
+		BackupInterval:      b.BackupInterval.Copy(),
+		StorageID:           b.StorageID,
+		SendNotificationsOn: b.SendNotificationsOn,
+		IsRetryIfFailed:     b.IsRetryIfFailed,
+		MaxFailedTriesCount: b.MaxFailedTriesCount,
+		Encryption:          b.Encryption,
 	}
 }
 
-func (b *BackupConfig) validateRetentionPolicy(plan *plans.DatabasePlan) error {
+func (b *BackupConfig) validateRetentionPolicy() error {
 	switch b.RetentionPolicyType {
 	case RetentionPolicyTypeTimePeriod, "":
 		if b.RetentionTimePeriod == "" {
 			return errors.New("retention time period is required")
-		}
-
-		if plan.MaxStoragePeriod != period.PeriodForever {
-			if b.RetentionTimePeriod.CompareTo(plan.MaxStoragePeriod) > 0 {
-				return errors.New("storage period exceeds plan limit")
-			}
 		}
 
 	case RetentionPolicyTypeCount:

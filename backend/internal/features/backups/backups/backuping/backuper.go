@@ -171,26 +171,6 @@ func (n *BackuperNode) MakeBackup(backupID uuid.UUID, isCallNotifier bool) {
 		backup.BackupSizeMb = completedMBs
 		backup.BackupDurationMs = time.Since(start).Milliseconds()
 
-		// Check size limit (0 = unlimited)
-		if backupConfig.MaxBackupSizeMB > 0 &&
-			completedMBs > float64(backupConfig.MaxBackupSizeMB) {
-			errMsg := fmt.Sprintf(
-				"backup size (%.2f MB) exceeded maximum allowed size (%d MB)",
-				completedMBs,
-				backupConfig.MaxBackupSizeMB,
-			)
-
-			backup.Status = backups_core.BackupStatusFailed
-			backup.IsSkipRetry = true
-			backup.FailMessage = &errMsg
-			if err := n.backupRepository.Save(backup); err != nil {
-				n.logger.Error("Failed to save backup with size exceeded error", "error", err)
-			}
-			cancel() // Cancel the backup context
-
-			return
-		}
-
 		if err := n.backupRepository.Save(backup); err != nil {
 			n.logger.Error("Failed to update backup progress", "error", err)
 		}

@@ -316,7 +316,9 @@ window.__RUNTIME_CONFIG__ = {
   GOOGLE_CLIENT_ID: '\${GOOGLE_CLIENT_ID:-}',
   IS_EMAIL_CONFIGURED: '\$IS_EMAIL_CONFIGURED',
   CLOUDFLARE_TURNSTILE_SITE_KEY: '\${CLOUDFLARE_TURNSTILE_SITE_KEY:-}',
-  CONTAINER_ARCH: '\${CONTAINER_ARCH:-unknown}'
+  CONTAINER_ARCH: '\${CONTAINER_ARCH:-unknown}',
+  CLOUD_PRICE_PER_GB: '\${CLOUD_PRICE_PER_GB:-}',
+  CLOUD_PADDLE_CLIENT_TOKEN: '\${CLOUD_PADDLE_CLIENT_TOKEN:-}'
 };
 JSEOF
 
@@ -326,6 +328,14 @@ if [ -n "\${ANALYTICS_SCRIPT:-}" ]; then
     echo "Injecting analytics script..."
     sed -i "s#</head>#  \${ANALYTICS_SCRIPT}\\
   </head>#" /app/ui/build/index.html
+  fi
+fi
+
+# Inject Paddle script if client token is provided (only if not already injected)
+if [ -n "\${CLOUD_PADDLE_CLIENT_TOKEN:-}" ]; then
+  if ! grep -q "cdn.paddle.com" /app/ui/build/index.html 2>/dev/null; then
+    echo "Injecting Paddle script..."
+    sed -i "s#</head>#  <script src=\"https://cdn.paddle.com/paddle/v2/paddle.js\"></script>\n  </head>#" /app/ui/build/index.html
   fi
 fi
 

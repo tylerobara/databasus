@@ -9,7 +9,6 @@ This is NOT a strict set of rules, but a set of recommendations to help you writ
 
 - [Engineering philosophy](#engineering-philosophy)
 - [Backend guidelines](#backend-guidelines)
-  - [Code style](#code-style)
   - [Boolean naming](#boolean-naming)
   - [Add reasonable new lines between logical statements](#add-reasonable-new-lines-between-logical-statements)
   - [Comments](#comments)
@@ -19,6 +18,7 @@ This is NOT a strict set of rules, but a set of recommendations to help you writ
   - [Refactoring](#refactoring)
   - [Testing](#testing)
   - [Time handling](#time-handling)
+  - [Logging](#logging)
   - [CRUD examples](#crud-examples)
 - [Frontend guidelines](#frontend-guidelines)
   - [React component structure](#react-component-structure)
@@ -121,157 +121,6 @@ Good:
 ```
 
 Exclusion: widely used variables like "db", "ctx", "req", "res", etc.
-
-### Code style
-
-**Always place private methods to the bottom of file**
-
-This rule applies to ALL Go files including tests, services, controllers, repositories, etc.
-
-In Go, exported (public) functions/methods start with uppercase letters, while unexported (private) ones start with lowercase letters.
-
-#### Structure order:
-
-1. Type definitions and constants
-2. Public methods/functions (uppercase)
-3. Private methods/functions (lowercase)
-
-#### Examples:
-
-**Service with methods:**
-
-```go
-type UserService struct {
-    repository *UserRepository
-}
-
-// Public methods first
-func (s *UserService) CreateUser(user *User) error {
-    if err := s.validateUser(user); err != nil {
-        return err
-    }
-    return s.repository.Save(user)
-}
-
-func (s *UserService) GetUser(id uuid.UUID) (*User, error) {
-    return s.repository.FindByID(id)
-}
-
-// Private methods at the bottom
-func (s *UserService) validateUser(user *User) error {
-    if user.Name == "" {
-        return errors.New("name is required")
-    }
-    return nil
-}
-```
-
-**Package-level functions:**
-
-```go
-package utils
-
-// Public functions first
-func ProcessData(data []byte) (Result, error) {
-    cleaned := sanitizeInput(data)
-    return parseData(cleaned)
-}
-
-func ValidateInput(input string) bool {
-    return isValidFormat(input) && checkLength(input)
-}
-
-// Private functions at the bottom
-func sanitizeInput(data []byte) []byte {
-    // implementation
-}
-
-func parseData(data []byte) (Result, error) {
-    // implementation
-}
-
-func isValidFormat(input string) bool {
-    // implementation
-}
-
-func checkLength(input string) bool {
-    // implementation
-}
-```
-
-**Test files:**
-
-```go
-package user_test
-
-// Public test functions first
-func Test_CreateUser_ValidInput_UserCreated(t *testing.T) {
-    user := createTestUser()
-    result, err := service.CreateUser(user)
-
-    assert.NoError(t, err)
-    assert.NotNil(t, result)
-}
-
-func Test_GetUser_ExistingUser_ReturnsUser(t *testing.T) {
-    user := createTestUser()
-    // test implementation
-}
-
-// Private helper functions at the bottom
-func createTestUser() *User {
-    return &User{
-        Name:  "Test User",
-        Email: "test@example.com",
-    }
-}
-
-func setupTestDatabase() *Database {
-    // setup implementation
-}
-```
-
-**Controller example:**
-
-```go
-type ProjectController struct {
-    service *ProjectService
-}
-
-// Public HTTP handlers first
-func (c *ProjectController) CreateProject(ctx *gin.Context) {
-    var request CreateProjectRequest
-    if err := ctx.ShouldBindJSON(&request); err != nil {
-        c.handleError(ctx, err)
-        return
-    }
-    // handler logic
-}
-
-func (c *ProjectController) GetProject(ctx *gin.Context) {
-    projectID := c.extractProjectID(ctx)
-    // handler logic
-}
-
-// Private helper methods at the bottom
-func (c *ProjectController) handleError(ctx *gin.Context, err error) {
-    ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-}
-
-func (c *ProjectController) extractProjectID(ctx *gin.Context) uuid.UUID {
-    return uuid.MustParse(ctx.Param("projectId"))
-}
-```
-
-#### Key points:
-
-- **Exported/Public** = starts with uppercase letter (CreateUser, GetProject)
-- **Unexported/Private** = starts with lowercase letter (validateUser, handleError)
-- This improves code readability by showing the public API first
-- Private helpers are implementation details, so they go at the bottom
-- Apply this rule consistently across ALL Go files in the project
-
----
 
 ### Boolean naming
 
@@ -1001,6 +850,20 @@ func Test_BackupLifecycle_CreateAndDelete(t *testing.T) {
 }
 ```
 
+#### Cloud testing
+
+If you are testing cloud, set isCloud = true before test run and defer isCloud = false after test run. Example helper function:
+
+```go
+func enableCloud(t *testing.T) {
+	t.Helper()
+	config.GetEnv().IsCloud = true
+	t.Cleanup(func() {
+		config.GetEnv().IsCloud = false
+	})
+}
+```
+
 #### Testing utilities structure
 
 **Create `testing.go` or `testing/testing.go` files with common utilities:**
@@ -1112,6 +975,100 @@ This ensures consistent timezone handling across the application.
 
 ---
 
+### Logging
+
+We use `log/slog` for structured logging. Follow these conventions to keep logs consistent, searchable, and useful for debugging.
+
+#### Scoped loggers for tracing
+
+Attach IDs via `logger.With(...)` as early as possible so every downstream log line carries them automatically. Common IDs: `database_id`, `subscription_id`, `backup_id`, `storage_id`, `user_id`.
+
+```go
+func (s *BillingService) CreateSubscription(logger *slog.Logger, user *users_models.User, databaseID uuid.UUID, storageGB int) {
+    logger = logger.With("database_id", databaseID)
+
+    // all subsequent logger calls automatically include database_id
+    logger.Debug(fmt.Sprintf("creating subscription for storage %d GB", storageGB))
+}
+```
+
+For background services, create scoped loggers with `task_name` for each subtask in `Run()`:
+
+```go
+func (c *BackupCleaner) Run(ctx context.Context) {
+    retentionLog := c.logger.With("task_name", "clean_by_retention_policy")
+    exceededLog := c.logger.With("task_name", "clean_exceeded_backups")
+
+    // pass scoped logger to each method
+    c.cleanByRetentionPolicy(retentionLog)
+    c.cleanExceededBackups(exceededLog)
+}
+```
+
+Within loops, scope further:
+
+```go
+for _, backupConfig := range enabledBackupConfigs {
+    dbLog := logger.With("database_id", backupConfig.DatabaseID, "policy", backupConfig.RetentionPolicyType)
+    // ...
+}
+```
+
+#### Values in message, IDs as kv pairs
+
+**Values and statuses** (sizes, counts, status transitions) go into the message via `fmt.Sprintf`:
+
+```go
+logger.Info(fmt.Sprintf("subscription renewed: %s -> %s, %d GB", oldStatus, newStatus, sub.StorageGB))
+logger.Info(
+    fmt.Sprintf("deleted exceeded backup: backup size is %.1f MB, total size is %.1f MB, limit is %d MB",
+        backup.BackupSizeMb, backupsTotalSizeMB, limitPerDbMB),
+    "backup_id", backup.ID,
+)
+```
+
+**IDs** stay as structured kv pairs — never inline them into the message string. This keeps them searchable in log aggregation tools:
+
+```go
+// good
+logger.Info("deleted old backup", "backup_id", backup.ID)
+
+// bad — ID buried in message, not searchable
+logger.Info(fmt.Sprintf("deleted old backup %s", backup.ID))
+```
+
+**`error` is always a kv pair**, never inlined into the message:
+
+```go
+// good
+logger.Error("failed to save subscription", "error", err)
+
+// bad
+logger.Error(fmt.Sprintf("failed to save subscription: %v", err))
+```
+
+#### Key naming and message style
+
+- **snake_case for all log keys**: `database_id`, `backup_id`, `task_name`, `total_size_mb` — not camelCase
+- **Lowercase log messages**: start with lowercase, no trailing period
+
+```go
+// good
+logger.Error("failed to create checkout session", "error", err)
+
+// bad
+logger.Error("Failed to create checkout session.", "error", err)
+```
+
+#### Log level usage
+
+- **Debug**: routine operations, entering a function, query results count (`"getting subscription events"`, `"found 5 invoices"`)
+- **Info**: significant state changes, completed actions (`"subscription activated"`, `"deleted exceeded backup"`)
+- **Warn**: degraded but recoverable situations (`"oldest backup is too recent to delete"`, `"requested storage is the same as current"`)
+- **Error**: failures that need attention (`"failed to save subscription"`, `"failed to delete backup file"`)
+
+---
+
 ### CRUD examples
 
 This is an example of complete CRUD implementation structure:
@@ -1127,7 +1084,6 @@ import (
     user_models "databasus-backend/internal/features/users/models"
 
     "github.com/gin-gonic/gin"
-    "github.com/google/uuid"
 )
 
 type AuditLogController struct {
@@ -1135,7 +1091,6 @@ type AuditLogController struct {
 }
 
 func (c *AuditLogController) RegisterRoutes(router *gin.RouterGroup) {
-    // All audit log endpoints require authentication (handled in main.go)
     auditRoutes := router.Group("/audit-logs")
 
     auditRoutes.GET("/global", c.GetGlobalAuditLogs)
@@ -1151,7 +1106,6 @@ func (c *AuditLogController) RegisterRoutes(router *gin.RouterGroup) {
 // @Security BearerAuth
 // @Param limit query int false "Limit number of results" default(100)
 // @Param offset query int false "Offset for pagination" default(0)
-// @Param beforeDate query string false "Filter logs created before this date (RFC3339 format)" format(date-time)
 // @Success 200 {object} GetAuditLogsResponse
 // @Failure 401 {object} map[string]string
 // @Failure 403 {object} map[string]string
@@ -1182,54 +1136,7 @@ func (c *AuditLogController) GetGlobalAuditLogs(ctx *gin.Context) {
     ctx.JSON(http.StatusOK, response)
 }
 
-// GetUserAuditLogs
-// @Summary Get user audit logs
-// @Description Retrieve audit logs for a specific user
-// @Tags audit-logs
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param userId path string true "User ID"
-// @Param limit query int false "Limit number of results" default(100)
-// @Param offset query int false "Offset for pagination" default(0)
-// @Param beforeDate query string false "Filter logs created before this date (RFC3339 format)" format(date-time)
-// @Success 200 {object} GetAuditLogsResponse
-// @Failure 400 {object} map[string]string
-// @Failure 401 {object} map[string]string
-// @Failure 403 {object} map[string]string
-// @Router /audit-logs/users/{userId} [get]
-func (c *AuditLogController) GetUserAuditLogs(ctx *gin.Context) {
-    user, isOk := ctx.MustGet("user").(*user_models.User)
-    if !isOk {
-        ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
-        return
-    }
-
-    userIDStr := ctx.Param("userId")
-    targetUserID, err := uuid.Parse(userIDStr)
-    if err != nil {
-        ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-        return
-    }
-
-    request := &GetAuditLogsRequest{}
-    if err := ctx.ShouldBindQuery(request); err != nil {
-        ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid query parameters"})
-        return
-    }
-
-    response, err := c.auditLogService.GetUserAuditLogs(targetUserID, user, request)
-    if err != nil {
-        if err.Error() == "insufficient permissions to view user audit logs" {
-            ctx.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-            return
-        }
-        ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve audit logs"})
-        return
-    }
-
-    ctx.JSON(http.StatusOK, response)
-}
+// GetUserAuditLogs follows the same pattern...
 ```
 
 #### controller_test.go
@@ -1237,34 +1144,13 @@ func (c *AuditLogController) GetUserAuditLogs(ctx *gin.Context) {
 ```go
 package audit_logs
 
-import (
-    "fmt"
-    "net/http"
-    "testing"
-    "time"
-
-    user_enums "databasus-backend/internal/features/users/enums"
-    users_middleware "databasus-backend/internal/features/users/middleware"
-    users_services "databasus-backend/internal/features/users/services"
-    users_testing "databasus-backend/internal/features/users/testing"
-    "databasus-backend/internal/storage"
-    test_utils "databasus-backend/internal/util/testing"
-
-    "github.com/gin-gonic/gin"
-    "github.com/google/uuid"
-    "github.com/stretchr/testify/assert"
-)
-
 func Test_GetGlobalAuditLogs_AdminSucceedsAndMemberGetsForbidden(t *testing.T) {
     adminUser := users_testing.CreateTestUser(user_enums.UserRoleAdmin)
     memberUser := users_testing.CreateTestUser(user_enums.UserRoleMember)
     router := createRouter()
     service := GetAuditLogService()
-    projectID := uuid.New()
 
-    // Create test logs
     createAuditLog(service, "Test log with user", &adminUser.UserID, nil)
-    createAuditLog(service, "Test log with project", nil, &projectID)
     createAuditLog(service, "Test log standalone", nil, nil)
 
     // Test ADMIN can access global logs
@@ -1272,91 +1158,14 @@ func Test_GetGlobalAuditLogs_AdminSucceedsAndMemberGetsForbidden(t *testing.T) {
     test_utils.MakeGetRequestAndUnmarshal(t, router,
         "/api/v1/audit-logs/global?limit=10", "Bearer "+adminUser.Token, http.StatusOK, &response)
 
-    assert.GreaterOrEqual(t, len(response.AuditLogs), 3)
-    assert.GreaterOrEqual(t, response.Total, int64(3))
-
+    assert.GreaterOrEqual(t, len(response.AuditLogs), 2)
     messages := extractMessages(response.AuditLogs)
     assert.Contains(t, messages, "Test log with user")
-    assert.Contains(t, messages, "Test log with project")
-    assert.Contains(t, messages, "Test log standalone")
 
     // Test MEMBER cannot access global logs
     resp := test_utils.MakeGetRequest(t, router, "/api/v1/audit-logs/global",
         "Bearer "+memberUser.Token, http.StatusForbidden)
     assert.Contains(t, string(resp.Body), "only administrators can view global audit logs")
-}
-
-func Test_GetUserAuditLogs_PermissionsEnforcedCorrectly(t *testing.T) {
-    adminUser := users_testing.CreateTestUser(user_enums.UserRoleAdmin)
-    user1 := users_testing.CreateTestUser(user_enums.UserRoleMember)
-    user2 := users_testing.CreateTestUser(user_enums.UserRoleMember)
-    router := createRouter()
-    service := GetAuditLogService()
-    projectID := uuid.New()
-
-    // Create test logs for different users
-    createAuditLog(service, "Test log user1 first", &user1.UserID, nil)
-    createAuditLog(service, "Test log user1 second", &user1.UserID, &projectID)
-    createAuditLog(service, "Test log user2 first", &user2.UserID, nil)
-    createAuditLog(service, "Test log user2 second", &user2.UserID, &projectID)
-    createAuditLog(service, "Test project log", nil, &projectID)
-
-    // Test ADMIN can view any user's logs
-    var user1Response GetAuditLogsResponse
-    test_utils.MakeGetRequestAndUnmarshal(t, router,
-        fmt.Sprintf("/api/v1/audit-logs/users/%s?limit=10", user1.UserID.String()),
-        "Bearer "+adminUser.Token, http.StatusOK, &user1Response)
-
-    assert.Equal(t, 2, len(user1Response.AuditLogs))
-    messages := extractMessages(user1Response.AuditLogs)
-    assert.Contains(t, messages, "Test log user1 first")
-    assert.Contains(t, messages, "Test log user1 second")
-
-    // Test user can view own logs
-    var ownLogsResponse GetAuditLogsResponse
-    test_utils.MakeGetRequestAndUnmarshal(t, router,
-        fmt.Sprintf("/api/v1/audit-logs/users/%s", user2.UserID.String()),
-        "Bearer "+user2.Token, http.StatusOK, &ownLogsResponse)
-    assert.Equal(t, 2, len(ownLogsResponse.AuditLogs))
-
-    // Test user cannot view other user's logs
-    resp := test_utils.MakeGetRequest(t, router,
-        fmt.Sprintf("/api/v1/audit-logs/users/%s", user1.UserID.String()),
-        "Bearer "+user2.Token, http.StatusForbidden)
-
-    assert.Contains(t, string(resp.Body), "insufficient permissions")
-}
-
-func Test_FilterAuditLogsByTime_ReturnsOnlyLogsBeforeDate(t *testing.T) {
-    adminUser := users_testing.CreateTestUser(user_enums.UserRoleAdmin)
-    router := createRouter()
-    service := GetAuditLogService()
-    db := storage.GetDb()
-    baseTime := time.Now().UTC()
-
-    // Create logs with different timestamps
-    createTimedLog(db, &adminUser.UserID, "Test old log", baseTime.Add(-2*time.Hour))
-    createTimedLog(db, &adminUser.UserID, "Test recent log", baseTime.Add(-30*time.Minute))
-    createAuditLog(service, "Test current log", &adminUser.UserID, nil)
-
-    // Test filtering - get logs before 1 hour ago
-    beforeTime := baseTime.Add(-1 * time.Hour)
-    var filteredResponse GetAuditLogsResponse
-    test_utils.MakeGetRequestAndUnmarshal(t, router,
-        fmt.Sprintf("/api/v1/audit-logs/global?beforeDate=%s", beforeTime.Format(time.RFC3339)),
-        "Bearer "+adminUser.Token, http.StatusOK, &filteredResponse)
-
-    // Verify only old log is returned
-    messages := extractMessages(filteredResponse.AuditLogs)
-    assert.Contains(t, messages, "Test old log")
-    assert.NotContains(t, messages, "Test recent log")
-    assert.NotContains(t, messages, "Test current log")
-
-    // Test without filter - should get all logs
-    var allResponse GetAuditLogsResponse
-    test_utils.MakeGetRequestAndUnmarshal(t, router, "/api/v1/audit-logs/global",
-        "Bearer "+adminUser.Token, http.StatusOK, &allResponse)
-    assert.GreaterOrEqual(t, len(allResponse.AuditLogs), 3)
 }
 
 func createRouter() *gin.Engine {
@@ -1384,12 +1193,10 @@ import (
 
 var auditLogRepository = &AuditLogRepository{}
 var auditLogService = &AuditLogService{
-    auditLogRepository: auditLogRepository,
-    logger:             logger.GetLogger(),
+    auditLogRepository,
+    logger.GetLogger(),
 }
-var auditLogController = &AuditLogController{
-    auditLogService: auditLogService,
-}
+var auditLogController = &AuditLogController{auditLogService}
 
 func GetAuditLogService() *AuditLogService {
     return auditLogService
@@ -1427,7 +1234,7 @@ type GetAuditLogsResponse struct {
 }
 ```
 
-#### models.go
+#### model.go
 
 ```go
 package audit_logs
@@ -1490,63 +1297,7 @@ func (r *AuditLogRepository) GetGlobal(limit, offset int, beforeDate *time.Time)
     return auditLogs, err
 }
 
-func (r *AuditLogRepository) GetByUser(
-    userID uuid.UUID,
-    limit, offset int,
-    beforeDate *time.Time,
-) ([]*AuditLog, error) {
-    var auditLogs []*AuditLog
-
-    query := storage.GetDb().
-        Where("user_id = ?", userID).
-        Order("created_at DESC")
-
-    if beforeDate != nil {
-        query = query.Where("created_at < ?", *beforeDate)
-    }
-
-    err := query.
-        Limit(limit).
-        Offset(offset).
-        Find(&auditLogs).Error
-
-    return auditLogs, err
-}
-
-func (r *AuditLogRepository) GetByProject(
-    projectID uuid.UUID,
-    limit, offset int,
-    beforeDate *time.Time,
-) ([]*AuditLog, error) {
-    var auditLogs []*AuditLog
-
-    query := storage.GetDb().
-        Where("project_id = ?", projectID).
-        Order("created_at DESC")
-
-    if beforeDate != nil {
-        query = query.Where("created_at < ?", *beforeDate)
-    }
-
-    err := query.
-        Limit(limit).
-        Offset(offset).
-        Find(&auditLogs).Error
-
-    return auditLogs, err
-}
-
-func (r *AuditLogRepository) CountGlobal(beforeDate *time.Time) (int64, error) {
-    var count int64
-    query := storage.GetDb().Model(&AuditLog{})
-
-    if beforeDate != nil {
-        query = query.Where("created_at < ?", *beforeDate)
-    }
-
-    err := query.Count(&count).Error
-    return count, err
-}
+// GetByUser, GetByProject, CountGlobal follow the same pattern...
 ```
 
 #### service.go
@@ -1570,11 +1321,7 @@ type AuditLogService struct {
     logger             *slog.Logger
 }
 
-func (s *AuditLogService) WriteAuditLog(
-    message string,
-    userID *uuid.UUID,
-    projectID *uuid.UUID,
-) {
+func (s *AuditLogService) WriteAuditLog(message string, userID *uuid.UUID, projectID *uuid.UUID) {
     auditLog := &AuditLog{
         UserID:    userID,
         ProjectID: projectID,
@@ -1582,15 +1329,9 @@ func (s *AuditLogService) WriteAuditLog(
         CreatedAt: time.Now().UTC(),
     }
 
-    err := s.auditLogRepository.Create(auditLog)
-    if err != nil {
+    if err := s.auditLogRepository.Create(auditLog); err != nil {
         s.logger.Error("failed to create audit log", "error", err)
-        return
     }
-}
-
-func (s *AuditLogService) CreateAuditLog(auditLog *AuditLog) error {
-    return s.auditLogRepository.Create(auditLog)
 }
 
 func (s *AuditLogService) GetGlobalAuditLogs(
@@ -1626,59 +1367,7 @@ func (s *AuditLogService) GetGlobalAuditLogs(
     }, nil
 }
 
-func (s *AuditLogService) GetUserAuditLogs(
-    targetUserID uuid.UUID,
-    user *user_models.User,
-    request *GetAuditLogsRequest,
-) (*GetAuditLogsResponse, error) {
-    // Users can view their own logs, ADMIN can view any user's logs
-    if user.Role != user_enums.UserRoleAdmin && user.ID != targetUserID {
-        return nil, errors.New("insufficient permissions to view user audit logs")
-    }
-
-    limit := request.Limit
-    if limit <= 0 || limit > 1000 {
-        limit = 100
-    }
-
-    offset := max(request.Offset, 0)
-
-    auditLogs, err := s.auditLogRepository.GetByUser(targetUserID, limit, offset, request.BeforeDate)
-    if err != nil {
-        return nil, err
-    }
-
-    return &GetAuditLogsResponse{
-        AuditLogs: auditLogs,
-        Total:     int64(len(auditLogs)),
-        Limit:     limit,
-        Offset:    offset,
-    }, nil
-}
-
-func (s *AuditLogService) GetProjectAuditLogs(
-    projectID uuid.UUID,
-    request *GetAuditLogsRequest,
-) (*GetAuditLogsResponse, error) {
-    limit := request.Limit
-    if limit <= 0 || limit > 1000 {
-        limit = 100
-    }
-
-    offset := max(request.Offset, 0)
-
-    auditLogs, err := s.auditLogRepository.GetByProject(projectID, limit, offset, request.BeforeDate)
-    if err != nil {
-        return nil, err
-    }
-
-    return &GetAuditLogsResponse{
-        AuditLogs: auditLogs,
-        Total:     int64(len(auditLogs)),
-        Limit:     limit,
-        Offset:    offset,
-    }, nil
-}
+// GetUserAuditLogs, GetProjectAuditLogs follow the same pattern...
 ```
 
 #### service_test.go
@@ -1686,34 +1375,16 @@ func (s *AuditLogService) GetProjectAuditLogs(
 ```go
 package audit_logs
 
-import (
-    "testing"
-    "time"
-
-    user_enums "databasus-backend/internal/features/users/enums"
-    users_testing "databasus-backend/internal/features/users/testing"
-
-    "github.com/google/uuid"
-    "github.com/stretchr/testify/assert"
-    "gorm.io/gorm"
-)
-
 func Test_AuditLogs_ProjectSpecificLogs(t *testing.T) {
     service := GetAuditLogService()
     user1 := users_testing.CreateTestUser(user_enums.UserRoleMember)
-    user2 := users_testing.CreateTestUser(user_enums.UserRoleMember)
-    project1ID, project2ID := uuid.New(), uuid.New()
+    project1ID := uuid.New()
 
-    // Create test logs for projects
     createAuditLog(service, "Test project1 log first", &user1.UserID, &project1ID)
-    createAuditLog(service, "Test project1 log second", &user2.UserID, &project1ID)
-    createAuditLog(service, "Test project2 log first", &user1.UserID, &project2ID)
-    createAuditLog(service, "Test project2 log second", &user2.UserID, &project2ID)
-    createAuditLog(service, "Test no project log", &user1.UserID, nil)
+    createAuditLog(service, "Test project1 log second", &user1.UserID, &project1ID)
 
     request := &GetAuditLogsRequest{Limit: 10, Offset: 0}
 
-    // Test project 1 logs
     project1Response, err := service.GetProjectAuditLogs(project1ID, request)
     assert.NoError(t, err)
     assert.Equal(t, 2, len(project1Response.AuditLogs))
@@ -1721,34 +1392,6 @@ func Test_AuditLogs_ProjectSpecificLogs(t *testing.T) {
     messages := extractMessages(project1Response.AuditLogs)
     assert.Contains(t, messages, "Test project1 log first")
     assert.Contains(t, messages, "Test project1 log second")
-    for _, log := range project1Response.AuditLogs {
-        assert.Equal(t, &project1ID, log.ProjectID)
-    }
-
-    // Test project 2 logs
-    project2Response, err := service.GetProjectAuditLogs(project2ID, request)
-    assert.NoError(t, err)
-    assert.Equal(t, 2, len(project2Response.AuditLogs))
-
-    messages2 := extractMessages(project2Response.AuditLogs)
-    assert.Contains(t, messages2, "Test project2 log first")
-    assert.Contains(t, messages2, "Test project2 log second")
-
-    // Test pagination
-    limitedResponse, err := service.GetProjectAuditLogs(project1ID,
-        &GetAuditLogsRequest{Limit: 1, Offset: 0})
-    assert.NoError(t, err)
-    assert.Equal(t, 1, len(limitedResponse.AuditLogs))
-    assert.Equal(t, 1, limitedResponse.Limit)
-
-    // Test beforeDate filter
-    beforeTime := time.Now().UTC().Add(-1 * time.Minute)
-    filteredResponse, err := service.GetProjectAuditLogs(project1ID,
-        &GetAuditLogsRequest{Limit: 10, BeforeDate: &beforeTime})
-    assert.NoError(t, err)
-    for _, log := range filteredResponse.AuditLogs {
-        assert.True(t, log.CreatedAt.Before(beforeTime))
-    }
 }
 
 func createAuditLog(service *AuditLogService, message string, userID, projectID *uuid.UUID) {
@@ -1761,16 +1404,6 @@ func extractMessages(logs []*AuditLog) []string {
         messages[i] = log.Message
     }
     return messages
-}
-
-func createTimedLog(db *gorm.DB, userID *uuid.UUID, message string, createdAt time.Time) {
-    log := &AuditLog{
-        ID:        uuid.New(),
-        UserID:    userID,
-        Message:   message,
-        CreatedAt: createdAt,
-    }
-    db.Create(log)
 }
 ```
 

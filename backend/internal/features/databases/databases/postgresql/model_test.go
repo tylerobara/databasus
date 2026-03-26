@@ -1310,6 +1310,46 @@ func Test_Validate_WhenRequiredFieldsMissing_ReturnsError(t *testing.T) {
 	}
 }
 
+func Test_Validate_WhenCloudAndBackupTypeIsNotPgDump_ValidationFails(t *testing.T) {
+	enableCloud(t)
+
+	model := &PostgresqlDatabase{
+		Host:       "example.com",
+		Port:       5432,
+		Username:   "user",
+		Password:   "pass",
+		CpuCount:   1,
+		BackupType: PostgresBackupTypeWalV1,
+	}
+
+	err := model.Validate()
+	assert.EqualError(t, err, "only PG_DUMP backup type is supported in cloud mode")
+}
+
+func Test_Validate_WhenCloudAndBackupTypeIsPgDump_ValidationPasses(t *testing.T) {
+	enableCloud(t)
+
+	model := &PostgresqlDatabase{
+		Host:       "example.com",
+		Port:       5432,
+		Username:   "user",
+		Password:   "pass",
+		CpuCount:   1,
+		BackupType: PostgresBackupTypePgDump,
+	}
+
+	err := model.Validate()
+	assert.NoError(t, err)
+}
+
+func enableCloud(t *testing.T) {
+	t.Helper()
+	config.GetEnv().IsCloud = true
+	t.Cleanup(func() {
+		config.GetEnv().IsCloud = false
+	})
+}
+
 type PostgresContainer struct {
 	Host     string
 	Port     int

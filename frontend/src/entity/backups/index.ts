@@ -8,4 +8,3 @@ export { BackupEncryption } from './model/BackupEncryption';
 export { PgWalBackupType } from './model/PgWalBackupType';
 export { RetentionPolicyType } from './model/RetentionPolicyType';
 export type { TransferDatabaseRequest } from './model/TransferDatabaseRequest';
-export type { DatabasePlan } from '../plan';

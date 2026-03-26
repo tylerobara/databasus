@@ -29,6 +29,7 @@ type BackupsScheduler struct {
 	taskCancelManager   *task_cancellation.TaskCancelManager
 	backupNodesRegistry *BackupNodesRegistry
 	databaseService     *databases.DatabaseService
+	billingService      BillingService
 
 	lastBackupTime time.Time
 	logger         *slog.Logger
@@ -125,6 +126,34 @@ func (s *BackupsScheduler) StartBackup(database *databases.Database, isCallNotif
 	if backupConfig.StorageID == nil {
 		s.logger.Error("Backup config storage ID is nil", "databaseId", database.ID)
 		return
+	}
+
+	if config.GetEnv().IsCloud {
+		subscription, subErr := s.billingService.GetSubscription(s.logger, database.ID)
+		if subErr != nil || !subscription.CanCreateNewBackups() {
+			failMessage := "subscription has expired, please renew"
+			backup := &backups_core.Backup{
+				ID:          uuid.New(),
+				DatabaseID:  database.ID,
+				StorageID:   *backupConfig.StorageID,
+				Status:      backups_core.BackupStatusFailed,
+				FailMessage: &failMessage,
+				IsSkipRetry: true,
+				CreatedAt:   time.Now().UTC(),
+			}
+
+			backup.GenerateFilename(database.Name)
+
+			if err := s.backupRepository.Save(backup); err != nil {
+				s.logger.Error(
+					"failed to save failed backup for expired subscription",
+					"database_id", database.ID,
+					"error", err,
+				)
+			}
+
+			return
+		}
 	}
 
 	// Check for existing in-progress backups
@@ -344,6 +373,27 @@ func (s *BackupsScheduler) runPendingBackups() error {
 
 			if database.IsAgentManagedBackup() {
 				continue
+			}
+
+			if config.GetEnv().IsCloud {
+				subscription, subErr := s.billingService.GetSubscription(s.logger, backupConfig.DatabaseID)
+				if subErr != nil {
+					s.logger.Warn(
+						"failed to get subscription, skipping backup",
+						"database_id", backupConfig.DatabaseID,
+						"error", subErr,
+					)
+					continue
+				}
+
+				if !subscription.CanCreateNewBackups() {
+					s.logger.Debug(
+						"subscription is not active, skipping scheduled backup",
+						"database_id", backupConfig.DatabaseID,
+						"subscription_status", subscription.Status,
+					)
+					continue
+				}
 			}
 
 			s.StartBackup(database, remainedBackupTryCount == 1)

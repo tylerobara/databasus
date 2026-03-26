@@ -1,3 +1,4 @@
+import { IS_CLOUD } from '../../../constants';
 import { StarButtonComponent } from '../../../shared/ui/StarButtonComponent';
 import { ThemeToggleComponent } from '../../../shared/ui/ThemeToggleComponent';
 
@@ -30,6 +31,17 @@ export function AuthNavbarComponent() {
         >
           Community
         </a>
+
+        {!IS_CLOUD && (
+          <a
+            className="!text-black hover:opacity-80 dark:!text-gray-200"
+            href="https://databasus.com/cloud"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Cloud (from $9)
+          </a>
+        )}
 
         <div className="flex items-center gap-2">
           <StarButtonComponent />

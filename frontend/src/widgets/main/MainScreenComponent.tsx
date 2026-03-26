@@ -2,7 +2,7 @@ import { LoadingOutlined, MenuOutlined } from '@ant-design/icons';
 import { App, Button, Spin, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
 
-import { APP_VERSION, CONTAINER_ARCH } from '../../constants';
+import { APP_VERSION, CONTAINER_ARCH, IS_CLOUD } from '../../constants';
 import { type DiskUsage, diskApi } from '../../entity/disk';
 import {
   type UserProfile,
@@ -229,6 +229,17 @@ export const MainScreenComponent = () => {
           >
             Community
           </a>
+
+          {!IS_CLOUD && (
+            <a
+              className="!text-black hover:opacity-80 dark:!text-gray-200"
+              href="https://databasus.com/cloud"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Cloud (from $9)
+            </a>
+          )}
 
           {isUsedMoreThan85Percent && (
             <Tooltip title="To make backups locally and restore them, you need to have enough space on your disk. For restore, you need to have same amount of space that the backup size.">

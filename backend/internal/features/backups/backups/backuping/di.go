@@ -10,6 +10,7 @@ import (
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	"databasus-backend/internal/features/backups/backups/usecases"
 	backups_config "databasus-backend/internal/features/backups/config"
+	"databasus-backend/internal/features/billing"
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/notifiers"
 	"databasus-backend/internal/features/storages"
@@ -28,6 +29,7 @@ var backupCleaner = &BackupCleaner{
 	backupRepository,
 	storages.GetStorageService(),
 	backups_config.GetBackupConfigService(),
+	billing.GetBillingService(),
 	encryption.GetFieldEncryptor(),
 	logger.GetLogger(),
 	[]backups_core.BackupRemoveListener{},
@@ -73,6 +75,7 @@ var backupsScheduler = &BackupsScheduler{
 	taskCancelManager,
 	backupNodesRegistry,
 	databases.GetDatabaseService(),
+	billing.GetBillingService(),
 	time.Now().UTC(),
 	logger.GetLogger(),
 	make(map[uuid.UUID]BackupToNodeRelation),

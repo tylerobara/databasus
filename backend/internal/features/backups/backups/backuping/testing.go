@@ -35,58 +35,74 @@ func CreateTestRouter() *gin.Engine {
 	return router
 }
 
+func CreateTestBackupCleaner(billingService BillingService) *BackupCleaner {
+	return &BackupCleaner{
+		backupRepository,
+		storages.GetStorageService(),
+		backups_config.GetBackupConfigService(),
+		billingService,
+		encryption.GetFieldEncryptor(),
+		logger.GetLogger(),
+		[]backups_core.BackupRemoveListener{},
+		sync.Once{},
+		atomic.Bool{},
+	}
+}
+
 func CreateTestBackuperNode() *BackuperNode {
 	return &BackuperNode{
-		databaseService:     databases.GetDatabaseService(),
-		fieldEncryptor:      encryption.GetFieldEncryptor(),
-		workspaceService:    workspaces_services.GetWorkspaceService(),
-		backupRepository:    backupRepository,
-		backupConfigService: backups_config.GetBackupConfigService(),
-		storageService:      storages.GetStorageService(),
-		notificationSender:  notifiers.GetNotifierService(),
-		backupCancelManager: taskCancelManager,
-		backupNodesRegistry: backupNodesRegistry,
-		logger:              logger.GetLogger(),
-		createBackupUseCase: usecases.GetCreateBackupUsecase(),
-		nodeID:              uuid.New(),
-		lastHeartbeat:       time.Time{},
-		runOnce:             sync.Once{},
-		hasRun:              atomic.Bool{},
+		databases.GetDatabaseService(),
+		encryption.GetFieldEncryptor(),
+		workspaces_services.GetWorkspaceService(),
+		backupRepository,
+		backups_config.GetBackupConfigService(),
+		storages.GetStorageService(),
+		notifiers.GetNotifierService(),
+		taskCancelManager,
+		backupNodesRegistry,
+		logger.GetLogger(),
+		usecases.GetCreateBackupUsecase(),
+		uuid.New(),
+		time.Time{},
+		sync.Once{},
+		atomic.Bool{},
 	}
 }
 
 func CreateTestBackuperNodeWithUseCase(useCase backups_core.CreateBackupUsecase) *BackuperNode {
 	return &BackuperNode{
-		databaseService:     databases.GetDatabaseService(),
-		fieldEncryptor:      encryption.GetFieldEncryptor(),
-		workspaceService:    workspaces_services.GetWorkspaceService(),
-		backupRepository:    backupRepository,
-		backupConfigService: backups_config.GetBackupConfigService(),
-		storageService:      storages.GetStorageService(),
-		notificationSender:  notifiers.GetNotifierService(),
-		backupCancelManager: taskCancelManager,
-		backupNodesRegistry: backupNodesRegistry,
-		logger:              logger.GetLogger(),
-		createBackupUseCase: useCase,
-		nodeID:              uuid.New(),
-		lastHeartbeat:       time.Time{},
-		runOnce:             sync.Once{},
-		hasRun:              atomic.Bool{},
+		databases.GetDatabaseService(),
+		encryption.GetFieldEncryptor(),
+		workspaces_services.GetWorkspaceService(),
+		backupRepository,
+		backups_config.GetBackupConfigService(),
+		storages.GetStorageService(),
+		notifiers.GetNotifierService(),
+		taskCancelManager,
+		backupNodesRegistry,
+		logger.GetLogger(),
+		useCase,
+		uuid.New(),
+		time.Time{},
+		sync.Once{},
+		atomic.Bool{},
 	}
 }
 
-func CreateTestScheduler() *BackupsScheduler {
+func CreateTestScheduler(billingService BillingService) *BackupsScheduler {
 	return &BackupsScheduler{
-		backupRepository:      backupRepository,
-		backupConfigService:   backups_config.GetBackupConfigService(),
-		taskCancelManager:     taskCancelManager,
-		backupNodesRegistry:   backupNodesRegistry,
-		lastBackupTime:        time.Now().UTC(),
-		logger:                logger.GetLogger(),
-		backupToNodeRelations: make(map[uuid.UUID]BackupToNodeRelation),
-		backuperNode:          CreateTestBackuperNode(),
-		runOnce:               sync.Once{},
-		hasRun:                atomic.Bool{},
+		backupRepository,
+		backups_config.GetBackupConfigService(),
+		taskCancelManager,
+		backupNodesRegistry,
+		databases.GetDatabaseService(),
+		billingService,
+		time.Now().UTC(),
+		logger.GetLogger(),
+		make(map[uuid.UUID]BackupToNodeRelation),
+		CreateTestBackuperNode(),
+		sync.Once{},
+		atomic.Bool{},
 	}
 }
 

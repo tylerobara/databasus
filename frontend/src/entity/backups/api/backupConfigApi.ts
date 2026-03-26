@@ -1,7 +1,6 @@
 import { getApplicationServer } from '../../../constants';
 import RequestOptions from '../../../shared/api/RequestOptions';
 import { apiHelper } from '../../../shared/api/apiHelper';
-import type { DatabasePlan } from '../../plan';
 import type { BackupConfig } from '../model/BackupConfig';
 import type { TransferDatabaseRequest } from '../model/TransferDatabaseRequest';
 
@@ -53,14 +52,6 @@ export const backupConfigApi = {
     await apiHelper.fetchPostJson(
       `${getApplicationServer()}/api/v1/backup-configs/database/${databaseId}/transfer`,
       requestOptions,
-    );
-  },
-
-  async getDatabasePlan(databaseId: string) {
-    return apiHelper.fetchGetJson<DatabasePlan>(
-      `${getApplicationServer()}/api/v1/backup-configs/database/${databaseId}/plan`,
-      undefined,
-      true,
     );
   },
 };

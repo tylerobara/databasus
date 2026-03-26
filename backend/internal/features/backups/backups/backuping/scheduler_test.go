@@ -10,6 +10,7 @@ import (
 
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	backups_config "databasus-backend/internal/features/backups/config"
+	billing_models "databasus-backend/internal/features/billing/models"
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/intervals"
 	"databasus-backend/internal/features/notifiers"
@@ -968,7 +969,7 @@ func Test_StartBackup_WhenBackupCompletes_DecrementsActiveTaskCount(t *testing.T
 	cache_utils.ClearAllCache()
 
 	// Start scheduler so it can handle task completions
-	scheduler := CreateTestScheduler()
+	scheduler := CreateTestScheduler(nil)
 	schedulerCancel := StartSchedulerForTest(t, scheduler)
 	defer schedulerCancel()
 
@@ -1065,7 +1066,7 @@ func Test_StartBackup_WhenBackupFails_DecrementsActiveTaskCount(t *testing.T) {
 	cache_utils.ClearAllCache()
 
 	// Start scheduler so it can handle task completions
-	scheduler := CreateTestScheduler()
+	scheduler := CreateTestScheduler(nil)
 	schedulerCancel := StartSchedulerForTest(t, scheduler)
 	defer schedulerCancel()
 
@@ -1332,7 +1333,7 @@ func Test_StartBackup_When2BackupsStartedForDifferentDatabases_BothUseCasesAreCa
 	defer StopBackuperNodeForTest(t, cancel, backuperNode)
 
 	// Create scheduler
-	scheduler := CreateTestScheduler()
+	scheduler := CreateTestScheduler(nil)
 	schedulerCancel := StartSchedulerForTest(t, scheduler)
 	defer schedulerCancel()
 
@@ -1455,6 +1456,316 @@ func Test_StartBackup_When2BackupsStartedForDifferentDatabases_BothUseCasesAreCa
 		assert.Equal(t, backups_core.BackupStatusCompleted, backups2[0].Status,
 			"Database2 backup should be completed")
 	}
+
+	time.Sleep(200 * time.Millisecond)
+}
+
+func Test_StartBackup_WhenCloudAndSubscriptionExpired_CreatesFailedBackup(t *testing.T) {
+	cache_utils.ClearAllCache()
+
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{
+			Status: billing_models.StatusExpired,
+		},
+	}
+	scheduler := CreateTestScheduler(mockBilling)
+
+	user := users_testing.CreateTestUser(users_enums.UserRoleAdmin)
+	router := CreateTestRouter()
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", user, router)
+	storage := storages.CreateTestStorage(workspace.ID)
+	notifier := notifiers.CreateTestNotifier(workspace.ID)
+	database := databases.CreateTestDatabase(workspace.ID, storage, notifier)
+
+	defer func() {
+		backups, _ := backupRepository.FindByDatabaseID(database.ID)
+		for _, backup := range backups {
+			backupRepository.DeleteByID(backup.ID)
+		}
+
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		notifiers.RemoveTestNotifier(notifier)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	backupConfig, err := backups_config.GetBackupConfigService().GetBackupConfigByDbId(database.ID)
+	assert.NoError(t, err)
+
+	backupConfig.Storage = storage
+	backupConfig.StorageID = &storage.ID
+
+	_, err = backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
+	assert.NoError(t, err)
+
+	enableCloud(t)
+
+	scheduler.StartBackup(database, false)
+
+	time.Sleep(100 * time.Millisecond)
+
+	backups, err := backupRepository.FindByDatabaseID(database.ID)
+	assert.NoError(t, err)
+	assert.Len(t, backups, 1)
+
+	newestBackup := backups[0]
+	assert.Equal(t, backups_core.BackupStatusFailed, newestBackup.Status)
+	assert.NotNil(t, newestBackup.FailMessage)
+	assert.Equal(t, "subscription has expired, please renew", *newestBackup.FailMessage)
+	assert.True(t, newestBackup.IsSkipRetry)
+
+	time.Sleep(200 * time.Millisecond)
+}
+
+func Test_StartBackup_WhenCloudAndSubscriptionActive_ProceedsNormally(t *testing.T) {
+	cache_utils.ClearAllCache()
+
+	backuperNode := CreateTestBackuperNode()
+	cancel := StartBackuperNodeForTest(t, backuperNode)
+	defer StopBackuperNodeForTest(t, cancel, backuperNode)
+
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{
+			Status:    billing_models.StatusActive,
+			StorageGB: 10,
+		},
+	}
+	scheduler := CreateTestScheduler(mockBilling)
+
+	user := users_testing.CreateTestUser(users_enums.UserRoleAdmin)
+	router := CreateTestRouter()
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", user, router)
+	storage := storages.CreateTestStorage(workspace.ID)
+	notifier := notifiers.CreateTestNotifier(workspace.ID)
+	database := databases.CreateTestDatabase(workspace.ID, storage, notifier)
+
+	defer func() {
+		backups, _ := backupRepository.FindByDatabaseID(database.ID)
+		for _, backup := range backups {
+			backupRepository.DeleteByID(backup.ID)
+		}
+
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		notifiers.RemoveTestNotifier(notifier)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	backupConfig, err := backups_config.GetBackupConfigService().GetBackupConfigByDbId(database.ID)
+	assert.NoError(t, err)
+
+	backupConfig.Storage = storage
+	backupConfig.StorageID = &storage.ID
+
+	_, err = backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
+	assert.NoError(t, err)
+
+	enableCloud(t)
+
+	scheduler.StartBackup(database, false)
+
+	WaitForBackupCompletion(t, database.ID, 0, 10*time.Second)
+
+	backups, err := backupRepository.FindByDatabaseID(database.ID)
+	assert.NoError(t, err)
+	assert.Len(t, backups, 1)
+
+	newestBackup := backups[0]
+	assert.Equal(t, backups_core.BackupStatusCompleted, newestBackup.Status)
+
+	time.Sleep(200 * time.Millisecond)
+}
+
+func Test_RunPendingBackups_WhenCloudAndSubscriptionExpired_SilentlySkips(t *testing.T) {
+	cache_utils.ClearAllCache()
+
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{
+			Status: billing_models.StatusExpired,
+		},
+	}
+	scheduler := CreateTestScheduler(mockBilling)
+
+	user := users_testing.CreateTestUser(users_enums.UserRoleAdmin)
+	router := CreateTestRouter()
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", user, router)
+	storage := storages.CreateTestStorage(workspace.ID)
+	notifier := notifiers.CreateTestNotifier(workspace.ID)
+	database := databases.CreateTestDatabase(workspace.ID, storage, notifier)
+
+	defer func() {
+		backups, _ := backupRepository.FindByDatabaseID(database.ID)
+		for _, backup := range backups {
+			backupRepository.DeleteByID(backup.ID)
+		}
+
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		notifiers.RemoveTestNotifier(notifier)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	backupConfig, err := backups_config.GetBackupConfigService().GetBackupConfigByDbId(database.ID)
+	assert.NoError(t, err)
+
+	timeOfDay := "04:00"
+	backupConfig.BackupInterval = &intervals.Interval{
+		Interval:  intervals.IntervalDaily,
+		TimeOfDay: &timeOfDay,
+	}
+	backupConfig.IsBackupsEnabled = true
+	backupConfig.RetentionPolicyType = backups_config.RetentionPolicyTypeTimePeriod
+	backupConfig.RetentionTimePeriod = period.PeriodWeek
+	backupConfig.Storage = storage
+	backupConfig.StorageID = &storage.ID
+
+	_, err = backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
+	assert.NoError(t, err)
+
+	backupRepository.Save(&backups_core.Backup{
+		DatabaseID: database.ID,
+		StorageID:  storage.ID,
+		Status:     backups_core.BackupStatusCompleted,
+		CreatedAt:  time.Now().UTC().Add(-24 * time.Hour),
+	})
+
+	enableCloud(t)
+
+	scheduler.runPendingBackups()
+
+	time.Sleep(100 * time.Millisecond)
+
+	backups, err := backupRepository.FindByDatabaseID(database.ID)
+	assert.NoError(t, err)
+	assert.Len(t, backups, 1, "No new backup should be created, scheduler silently skips expired subscriptions")
+
+	time.Sleep(200 * time.Millisecond)
+}
+
+func Test_StartBackup_WhenNotCloudAndSubscriptionExpired_ProceedsNormally(t *testing.T) {
+	cache_utils.ClearAllCache()
+
+	backuperNode := CreateTestBackuperNode()
+	cancel := StartBackuperNodeForTest(t, backuperNode)
+	defer StopBackuperNodeForTest(t, cancel, backuperNode)
+
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{
+			Status: billing_models.StatusExpired,
+		},
+	}
+	scheduler := CreateTestScheduler(mockBilling)
+
+	user := users_testing.CreateTestUser(users_enums.UserRoleAdmin)
+	router := CreateTestRouter()
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", user, router)
+	storage := storages.CreateTestStorage(workspace.ID)
+	notifier := notifiers.CreateTestNotifier(workspace.ID)
+	database := databases.CreateTestDatabase(workspace.ID, storage, notifier)
+
+	defer func() {
+		backups, _ := backupRepository.FindByDatabaseID(database.ID)
+		for _, backup := range backups {
+			backupRepository.DeleteByID(backup.ID)
+		}
+
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		notifiers.RemoveTestNotifier(notifier)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	backupConfig, err := backups_config.GetBackupConfigService().GetBackupConfigByDbId(database.ID)
+	assert.NoError(t, err)
+
+	backupConfig.Storage = storage
+	backupConfig.StorageID = &storage.ID
+
+	_, err = backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
+	assert.NoError(t, err)
+
+	scheduler.StartBackup(database, false)
+
+	WaitForBackupCompletion(t, database.ID, 0, 10*time.Second)
+
+	backups, err := backupRepository.FindByDatabaseID(database.ID)
+	assert.NoError(t, err)
+	assert.Len(t, backups, 1)
+	assert.Equal(t, backups_core.BackupStatusCompleted, backups[0].Status,
+		"Billing check should not apply in non-cloud mode")
+
+	time.Sleep(200 * time.Millisecond)
+}
+
+func Test_RunPendingBackups_WhenNotCloudAndSubscriptionExpired_ProceedsNormally(t *testing.T) {
+	cache_utils.ClearAllCache()
+
+	backuperNode := CreateTestBackuperNode()
+	cancel := StartBackuperNodeForTest(t, backuperNode)
+	defer StopBackuperNodeForTest(t, cancel, backuperNode)
+
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{
+			Status: billing_models.StatusExpired,
+		},
+	}
+	scheduler := CreateTestScheduler(mockBilling)
+
+	user := users_testing.CreateTestUser(users_enums.UserRoleAdmin)
+	router := CreateTestRouter()
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", user, router)
+	storage := storages.CreateTestStorage(workspace.ID)
+	notifier := notifiers.CreateTestNotifier(workspace.ID)
+	database := databases.CreateTestDatabase(workspace.ID, storage, notifier)
+
+	defer func() {
+		backups, _ := backupRepository.FindByDatabaseID(database.ID)
+		for _, backup := range backups {
+			backupRepository.DeleteByID(backup.ID)
+		}
+
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		notifiers.RemoveTestNotifier(notifier)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	backupConfig, err := backups_config.GetBackupConfigService().GetBackupConfigByDbId(database.ID)
+	assert.NoError(t, err)
+
+	timeOfDay := "04:00"
+	backupConfig.BackupInterval = &intervals.Interval{
+		Interval:  intervals.IntervalDaily,
+		TimeOfDay: &timeOfDay,
+	}
+	backupConfig.IsBackupsEnabled = true
+	backupConfig.RetentionPolicyType = backups_config.RetentionPolicyTypeTimePeriod
+	backupConfig.RetentionTimePeriod = period.PeriodWeek
+	backupConfig.Storage = storage
+	backupConfig.StorageID = &storage.ID
+
+	_, err = backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
+	assert.NoError(t, err)
+
+	backupRepository.Save(&backups_core.Backup{
+		DatabaseID: database.ID,
+		StorageID:  storage.ID,
+		Status:     backups_core.BackupStatusCompleted,
+		CreatedAt:  time.Now().UTC().Add(-24 * time.Hour),
+	})
+
+	scheduler.runPendingBackups()
+
+	WaitForBackupCompletion(t, database.ID, 1, 10*time.Second)
+
+	backups, err := backupRepository.FindByDatabaseID(database.ID)
+	assert.NoError(t, err)
+	assert.Len(t, backups, 2, "Billing check should not apply in non-cloud mode, new backup should be created")
 
 	time.Sleep(200 * time.Millisecond)
 }

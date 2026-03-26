@@ -5,6 +5,9 @@ interface RuntimeConfig {
   IS_EMAIL_CONFIGURED?: string;
   CLOUDFLARE_TURNSTILE_SITE_KEY?: string;
   CONTAINER_ARCH?: string;
+  CLOUD_PRICE_PER_GB?: string;
+  CLOUD_PADDLE_CLIENT_TOKEN?: string;
+  CLOUD_IS_PADDLE_SANDBOX?: string;
 }
 
 declare global {
@@ -31,6 +34,10 @@ export const APP_VERSION = (import.meta.env.VITE_APP_VERSION as string) || 'dev'
 export const IS_CLOUD =
   window.__RUNTIME_CONFIG__?.IS_CLOUD === 'true' || import.meta.env.VITE_IS_CLOUD === 'true';
 
+export const CLOUD_PRICE_PER_GB = Number(
+  window.__RUNTIME_CONFIG__?.CLOUD_PRICE_PER_GB || import.meta.env.VITE_CLOUD_PRICE_PER_GB || '0',
+);
+
 export const GITHUB_CLIENT_ID =
   window.__RUNTIME_CONFIG__?.GITHUB_CLIENT_ID || import.meta.env.VITE_GITHUB_CLIENT_ID || '';
 
@@ -45,6 +52,15 @@ export const CLOUDFLARE_TURNSTILE_SITE_KEY =
   window.__RUNTIME_CONFIG__?.CLOUDFLARE_TURNSTILE_SITE_KEY ||
   import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY ||
   '';
+
+export const PADDLE_CLIENT_TOKEN =
+  window.__RUNTIME_CONFIG__?.CLOUD_PADDLE_CLIENT_TOKEN ||
+  import.meta.env.VITE_CLOUD_PADDLE_CLIENT_TOKEN ||
+  '';
+
+export const IS_PADDLE_SANDBOX =
+  window.__RUNTIME_CONFIG__?.CLOUD_IS_PADDLE_SANDBOX === 'true' ||
+  import.meta.env.VITE_CLOUD_IS_PADDLE_SANDBOX === 'true';
 
 const archMap: Record<string, string> = { amd64: 'x64', arm64: 'arm64' };
 const rawArch = window.__RUNTIME_CONFIG__?.CONTAINER_ARCH || 'unknown';

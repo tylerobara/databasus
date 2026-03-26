@@ -19,7 +19,6 @@ import { IS_CLOUD } from '../../../constants';
 import {
   type BackupConfig,
   BackupEncryption,
-  type DatabasePlan,
   RetentionPolicyType,
   backupConfigApi,
 } from '../../../entity/backups';
@@ -97,13 +96,9 @@ export const EditBackupConfigComponent = ({
 
   const [isShowWarn, setIsShowWarn] = useState(false);
 
-  const [databasePlan, setDatabasePlan] = useState<DatabasePlan>();
   const [isLoading, setIsLoading] = useState(true);
 
-  const hasAdvancedValues =
-    !!backupConfig?.isRetryIfFailed ||
-    (backupConfig?.maxBackupSizeMb ?? 0) > 0 ||
-    (backupConfig?.maxBackupsTotalSizeMb ?? 0) > 0;
+  const hasAdvancedValues = !!backupConfig?.isRetryIfFailed;
   const [isShowAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
   const [isShowGfsHint, setShowGfsHint] = useState(false);
 
@@ -113,65 +108,6 @@ export const EditBackupConfigComponent = ({
   }, []);
 
   const dateTimeFormat = useMemo(() => getUserTimeFormat(), []);
-
-  const createDefaultPlan = (databaseId: string, isCloud: boolean): DatabasePlan => {
-    if (isCloud) {
-      return {
-        databaseId,
-        maxBackupSizeMb: 100,
-        maxBackupsTotalSizeMb: 4000,
-        maxStoragePeriod: Period.WEEK,
-      };
-    } else {
-      return {
-        databaseId,
-        maxBackupSizeMb: 0,
-        maxBackupsTotalSizeMb: 0,
-        maxStoragePeriod: Period.FOREVER,
-      };
-    }
-  };
-
-  const isPeriodAllowed = (period: Period, maxPeriod: Period): boolean => {
-    const periodOrder = [
-      Period.DAY,
-      Period.WEEK,
-      Period.MONTH,
-      Period.THREE_MONTH,
-      Period.SIX_MONTH,
-      Period.YEAR,
-      Period.TWO_YEARS,
-      Period.THREE_YEARS,
-      Period.FOUR_YEARS,
-      Period.FIVE_YEARS,
-      Period.FOREVER,
-    ];
-    const periodIndex = periodOrder.indexOf(period);
-    const maxIndex = periodOrder.indexOf(maxPeriod);
-    return periodIndex <= maxIndex;
-  };
-
-  const availablePeriods = useMemo(() => {
-    const allPeriods = [
-      { label: '1 day', value: Period.DAY },
-      { label: '1 week', value: Period.WEEK },
-      { label: '1 month', value: Period.MONTH },
-      { label: '3 months', value: Period.THREE_MONTH },
-      { label: '6 months', value: Period.SIX_MONTH },
-      { label: '1 year', value: Period.YEAR },
-      { label: '2 years', value: Period.TWO_YEARS },
-      { label: '3 years', value: Period.THREE_YEARS },
-      { label: '4 years', value: Period.FOUR_YEARS },
-      { label: '5 years', value: Period.FIVE_YEARS },
-      { label: 'Forever', value: Period.FOREVER },
-    ];
-
-    if (!databasePlan) {
-      return allPeriods;
-    }
-
-    return allPeriods.filter((p) => isPeriodAllowed(p.value, databasePlan.maxStoragePeriod));
-  }, [databasePlan]);
 
   const updateBackupConfig = (patch: Partial<BackupConfig>) => {
     setBackupConfig((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -237,13 +173,7 @@ export const EditBackupConfigComponent = ({
           setBackupConfig(config);
           setIsUnsaved(false);
           setIsSaving(false);
-
-          const plan = await backupConfigApi.getDatabasePlan(database.id);
-          setDatabasePlan(plan);
         } else {
-          const plan = createDefaultPlan('', IS_CLOUD);
-          setDatabasePlan(plan);
-
           setBackupConfig({
             databaseId: database.id,
             isBackupsEnabled: true,
@@ -256,11 +186,7 @@ export const EditBackupConfigComponent = ({
             retentionPolicyType: IS_CLOUD
               ? RetentionPolicyType.GFS
               : RetentionPolicyType.TimePeriod,
-            retentionTimePeriod: IS_CLOUD
-              ? plan.maxStoragePeriod === Period.FOREVER
-                ? Period.THREE_MONTH
-                : plan.maxStoragePeriod
-              : Period.THREE_MONTH,
+            retentionTimePeriod: Period.THREE_MONTH,
             retentionCount: 100,
             retentionGfsHours: 24,
             retentionGfsDays: 7,
@@ -271,8 +197,6 @@ export const EditBackupConfigComponent = ({
             isRetryIfFailed: true,
             maxFailedTriesCount: 3,
             encryption: BackupEncryption.ENCRYPTED,
-            maxBackupSizeMb: plan.maxBackupSizeMb,
-            maxBackupsTotalSizeMb: plan.maxBackupsTotalSizeMb,
           });
         }
 
@@ -604,7 +528,19 @@ export const EditBackupConfigComponent = ({
                 onChange={(v) => updateBackupConfig({ retentionTimePeriod: v })}
                 size="small"
                 className="w-[200px]"
-                options={availablePeriods}
+                options={[
+                  { label: '1 day', value: Period.DAY },
+                  { label: '1 week', value: Period.WEEK },
+                  { label: '1 month', value: Period.MONTH },
+                  { label: '3 months', value: Period.THREE_MONTH },
+                  { label: '6 months', value: Period.SIX_MONTH },
+                  { label: '1 year', value: Period.YEAR },
+                  { label: '2 years', value: Period.TWO_YEARS },
+                  { label: '3 years', value: Period.THREE_YEARS },
+                  { label: '4 years', value: Period.FOUR_YEARS },
+                  { label: '5 years', value: Period.FIVE_YEARS },
+                  { label: 'Forever', value: Period.FOREVER },
+                ]}
               />
 
               <Tooltip
@@ -826,121 +762,6 @@ export const EditBackupConfigComponent = ({
                 >
                   <InfoCircleOutlined className="ml-2" style={{ color: 'gray' }} />
                 </Tooltip>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-5 mb-1 flex w-full flex-col items-start sm:flex-row sm:items-center">
-            <div className="mb-1 min-w-[150px] sm:mb-0">Max backup size limit</div>
-            <div className="flex items-center">
-              <Switch
-                size="small"
-                checked={backupConfig.maxBackupSizeMb > 0}
-                disabled={IS_CLOUD}
-                onChange={(checked) => {
-                  updateBackupConfig({
-                    maxBackupSizeMb: checked ? backupConfig.maxBackupSizeMb || 1000 : 0,
-                  });
-                }}
-              />
-
-              <Tooltip
-                className="cursor-pointer"
-                title="Limits the size of each individual backup. Note that backups are typically 15× smaller than the database size. For example, a 100 MB backup represents approximately 1.5 GB database."
-              >
-                <InfoCircleOutlined className="ml-2" style={{ color: 'gray' }} />
-              </Tooltip>
-            </div>
-          </div>
-
-          {backupConfig.maxBackupSizeMb > 0 && (
-            <div className="mb-5 flex w-full flex-col items-start sm:flex-row sm:items-center">
-              <div className="mb-1 min-w-[150px] sm:mb-0">Max file size (MB)</div>
-
-              <InputNumber
-                min={1}
-                max={
-                  databasePlan?.maxBackupSizeMb && databasePlan.maxBackupSizeMb > 0
-                    ? databasePlan.maxBackupSizeMb
-                    : undefined
-                }
-                value={backupConfig.maxBackupSizeMb}
-                onChange={(value) => {
-                  const newValue = value || 1;
-                  if (databasePlan?.maxBackupSizeMb && databasePlan.maxBackupSizeMb > 0) {
-                    updateBackupConfig({
-                      maxBackupSizeMb: Math.min(newValue, databasePlan.maxBackupSizeMb),
-                    });
-                  } else {
-                    updateBackupConfig({ maxBackupSizeMb: newValue });
-                  }
-                }}
-                size="small"
-                className="w-full max-w-[75px] grow"
-              />
-
-              <div className="ml-2 text-xs text-gray-600 dark:text-gray-400">
-                ~{((backupConfig.maxBackupSizeMb / 1024) * 15).toFixed(2)} GB DB size
-              </div>
-            </div>
-          )}
-
-          <div className="mb-1 flex w-full flex-col items-start sm:flex-row sm:items-center">
-            <div className="mb-1 min-w-[150px] sm:mb-0">Limit total backups size</div>
-            <div className="flex items-center">
-              <Switch
-                size="small"
-                checked={backupConfig.maxBackupsTotalSizeMb > 0}
-                disabled={IS_CLOUD}
-                onChange={(checked) => {
-                  updateBackupConfig({
-                    maxBackupsTotalSizeMb: checked
-                      ? backupConfig.maxBackupsTotalSizeMb || 1_000_000
-                      : 0,
-                  });
-                }}
-              />
-
-              <Tooltip
-                className="cursor-pointer"
-                title="Limits the total size of all backups in storage (like S3, local, etc.). Once this limit is exceeded, the oldest backups are automatically removed until the total size is within the limit again."
-              >
-                <InfoCircleOutlined className="ml-2" style={{ color: 'gray' }} />
-              </Tooltip>
-            </div>
-          </div>
-
-          {backupConfig.maxBackupsTotalSizeMb > 0 && (
-            <div className="mb-1 flex w-full flex-col items-start sm:flex-row sm:items-center">
-              <div className="mb-1 min-w-[150px] sm:mb-0">Backups files size (MB)</div>
-              <InputNumber
-                min={1}
-                max={
-                  databasePlan?.maxBackupsTotalSizeMb && databasePlan.maxBackupsTotalSizeMb > 0
-                    ? databasePlan.maxBackupsTotalSizeMb
-                    : undefined
-                }
-                value={backupConfig.maxBackupsTotalSizeMb}
-                onChange={(value) => {
-                  const newValue = value || 1;
-                  if (
-                    databasePlan?.maxBackupsTotalSizeMb &&
-                    databasePlan.maxBackupsTotalSizeMb > 0
-                  ) {
-                    updateBackupConfig({
-                      maxBackupsTotalSizeMb: Math.min(newValue, databasePlan.maxBackupsTotalSizeMb),
-                    });
-                  } else {
-                    updateBackupConfig({ maxBackupsTotalSizeMb: newValue });
-                  }
-                }}
-                size="small"
-                className="w-full max-w-[75px] grow"
-              />
-
-              <div className="ml-2 text-xs text-gray-600 dark:text-gray-400">
-                {(backupConfig.maxBackupsTotalSizeMb / 1024).toFixed(2)} GB (~
-                {backupConfig.maxBackupsTotalSizeMb / backupConfig.maxBackupSizeMb} backups)
               </div>
             </div>
           )}

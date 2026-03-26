@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 	backups_download "databasus-backend/internal/features/backups/backups/download"
 	backups_services "databasus-backend/internal/features/backups/backups/services"
 	backups_config "databasus-backend/internal/features/backups/config"
+	"databasus-backend/internal/features/billing"
+	billing_paddle "databasus-backend/internal/features/billing/paddle"
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/disk"
 	"databasus-backend/internal/features/encryption/secrets"
@@ -105,7 +108,9 @@ func main() {
 	go generateSwaggerDocs(log)
 
 	gin.SetMode(gin.ReleaseMode)
-	ginApp := gin.Default()
+	ginApp := gin.New()
+	ginApp.Use(gin.Logger())
+	ginApp.Use(ginRecoveryWithLogger(log))
 
 	// Add GZIP compression middleware
 	ginApp.Use(gzip.Gzip(
@@ -217,6 +222,10 @@ func setUpRoutes(r *gin.Engine) {
 	backups_controllers.GetPostgresWalBackupController().RegisterRoutes(v1)
 	databases.GetDatabaseController().RegisterPublicRoutes(v1)
 
+	if config.GetEnv().IsCloud {
+		billing_paddle.GetPaddleBillingController().RegisterPublicRoutes(v1)
+	}
+
 	// Setup auth middleware
 	userService := users_services.GetUserService()
 	authMiddleware := users_middleware.AuthMiddleware(userService)
@@ -240,6 +249,7 @@ func setUpRoutes(r *gin.Engine) {
 	audit_logs.GetAuditLogController().RegisterRoutes(protected)
 	users_controllers.GetManagementController().RegisterRoutes(protected)
 	users_controllers.GetSettingsController().RegisterRoutes(protected)
+	billing.GetBillingController().RegisterRoutes(protected)
 }
 
 func setUpDependencies() {
@@ -252,6 +262,11 @@ func setUpDependencies() {
 	storages.SetupDependencies()
 	backups_config.SetupDependencies()
 	task_cancellation.SetupDependencies()
+	billing.SetupDependencies()
+
+	if config.GetEnv().IsCloud {
+		billing_paddle.SetupDependencies()
+	}
 }
 
 func runBackgroundTasks(log *slog.Logger) {
@@ -308,6 +323,12 @@ func runBackgroundTasks(log *slog.Logger) {
 		go runWithPanicLogging(log, "restore nodes registry background service", func() {
 			restoring.GetRestoreNodesRegistry().Run(ctx)
 		})
+
+		if config.GetEnv().IsCloud {
+			go runWithPanicLogging(log, "billing background service", func() {
+				billing.GetBillingService().Run(ctx, *log)
+			})
+		}
 	} else {
 		log.Info("Skipping primary node tasks as not primary node")
 	}
@@ -330,7 +351,7 @@ func runBackgroundTasks(log *slog.Logger) {
 func runWithPanicLogging(log *slog.Logger, serviceName string, fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("Panic in "+serviceName, "error", r)
+			log.Error("Panic in "+serviceName, "error", r, "stacktrace", string(debug.Stack()))
 		}
 	}()
 	fn()
@@ -407,6 +428,25 @@ func enableCors(ginApp *gin.Engine) {
 			},
 			AllowCredentials: true,
 		}))
+	}
+}
+
+func ginRecoveryWithLogger(log *slog.Logger) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("Panic recovered in HTTP handler",
+					"error", r,
+					"stacktrace", string(debug.Stack()),
+					"method", ctx.Request.Method,
+					"path", ctx.Request.URL.Path,
+				)
+
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+			}
+		}()
+
+		ctx.Next()
 	}
 }
 

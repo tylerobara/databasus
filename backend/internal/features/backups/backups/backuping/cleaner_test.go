@@ -1,14 +1,17 @@
 package backuping
 
 import (
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"databasus-backend/internal/config"
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	backups_config "databasus-backend/internal/features/backups/config"
+	billing_models "databasus-backend/internal/features/billing/models"
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/intervals"
 	"databasus-backend/internal/features/notifiers"
@@ -17,6 +20,7 @@ import (
 	users_testing "databasus-backend/internal/features/users/testing"
 	workspaces_testing "databasus-backend/internal/features/workspaces/testing"
 	"databasus-backend/internal/storage"
+	"databasus-backend/internal/util/logger"
 	"databasus-backend/internal/util/period"
 )
 
@@ -51,6 +55,7 @@ func Test_CleanOldBackups_DeletesBackupsOlderThanRetentionTimePeriod(t *testing.
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -89,7 +94,7 @@ func Test_CleanOldBackups_DeletesBackupsOlderThanRetentionTimePeriod(t *testing.
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -129,6 +134,7 @@ func Test_CleanOldBackups_SkipsDatabaseWithForeverRetentionPeriod(t *testing.T) 
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -145,7 +151,7 @@ func Test_CleanOldBackups_SkipsDatabaseWithForeverRetentionPeriod(t *testing.T) 
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -154,7 +160,8 @@ func Test_CleanOldBackups_SkipsDatabaseWithForeverRetentionPeriod(t *testing.T) 
 	assert.Equal(t, oldBackup.ID, remainingBackups[0].ID)
 }
 
-func Test_CleanExceededBackups_WhenUnderLimit_NoBackupsDeleted(t *testing.T) {
+func Test_CleanExceededBackups_WhenUnderStorageLimit_NoBackupsDeleted(t *testing.T) {
+	enableCloud(t)
 	router := CreateTestRouter()
 	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
@@ -178,14 +185,14 @@ func Test_CleanExceededBackups_WhenUnderLimit_NoBackupsDeleted(t *testing.T) {
 	interval := createTestInterval()
 
 	backupConfig := &backups_config.BackupConfig{
-		DatabaseID:            database.ID,
-		IsBackupsEnabled:      true,
-		RetentionPolicyType:   backups_config.RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   period.PeriodForever,
-		StorageID:             &storage.ID,
-		MaxBackupsTotalSizeMB: 100,
-		BackupIntervalID:      interval.ID,
-		BackupInterval:        interval,
+		DatabaseID:          database.ID,
+		IsBackupsEnabled:    true,
+		RetentionPolicyType: backups_config.RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.PeriodForever,
+		StorageID:           &storage.ID,
+		BackupIntervalID:    interval.ID,
+		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -196,15 +203,18 @@ func Test_CleanExceededBackups_WhenUnderLimit_NoBackupsDeleted(t *testing.T) {
 			DatabaseID:   database.ID,
 			StorageID:    storage.ID,
 			Status:       backups_core.BackupStatusCompleted,
-			BackupSizeMb: 16.67,
+			BackupSizeMb: 100,
 			CreatedAt:    time.Now().UTC().Add(-time.Duration(i) * time.Hour),
 		}
 		err = backupRepository.Save(backup)
 		assert.NoError(t, err)
 	}
 
-	cleaner := GetBackupCleaner()
-	err = cleaner.cleanExceededBackups()
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{StorageGB: 1, Status: billing_models.StatusActive},
+	}
+	cleaner := CreateTestBackupCleaner(mockBilling)
+	err = cleaner.cleanExceededStorageBackups(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -212,7 +222,8 @@ func Test_CleanExceededBackups_WhenUnderLimit_NoBackupsDeleted(t *testing.T) {
 	assert.Equal(t, 3, len(remainingBackups))
 }
 
-func Test_CleanExceededBackups_WhenOverLimit_DeletesOldestBackups(t *testing.T) {
+func Test_CleanExceededBackups_WhenOverStorageLimit_DeletesOldestBackups(t *testing.T) {
+	enableCloud(t)
 	router := CreateTestRouter()
 	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
@@ -236,18 +247,20 @@ func Test_CleanExceededBackups_WhenOverLimit_DeletesOldestBackups(t *testing.T) 
 	interval := createTestInterval()
 
 	backupConfig := &backups_config.BackupConfig{
-		DatabaseID:            database.ID,
-		IsBackupsEnabled:      true,
-		RetentionPolicyType:   backups_config.RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   period.PeriodForever,
-		StorageID:             &storage.ID,
-		MaxBackupsTotalSizeMB: 30,
-		BackupIntervalID:      interval.ID,
-		BackupInterval:        interval,
+		DatabaseID:          database.ID,
+		IsBackupsEnabled:    true,
+		RetentionPolicyType: backups_config.RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.PeriodForever,
+		StorageID:           &storage.ID,
+		BackupIntervalID:    interval.ID,
+		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
 
+	// 5 backups at 300 MB each = 1500 MB total, limit = 1 GB (1024 MB)
+	// Expect 2 oldest deleted, 3 remain (900 MB < 1024 MB)
 	now := time.Now().UTC()
 	var backupIDs []uuid.UUID
 	for i := 0; i < 5; i++ {
@@ -256,7 +269,7 @@ func Test_CleanExceededBackups_WhenOverLimit_DeletesOldestBackups(t *testing.T) 
 			DatabaseID:   database.ID,
 			StorageID:    storage.ID,
 			Status:       backups_core.BackupStatusCompleted,
-			BackupSizeMb: 10,
+			BackupSizeMb: 300,
 			CreatedAt:    now.Add(-time.Duration(4-i) * time.Hour),
 		}
 		err = backupRepository.Save(backup)
@@ -264,8 +277,11 @@ func Test_CleanExceededBackups_WhenOverLimit_DeletesOldestBackups(t *testing.T) 
 		backupIDs = append(backupIDs, backup.ID)
 	}
 
-	cleaner := GetBackupCleaner()
-	err = cleaner.cleanExceededBackups()
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{StorageGB: 1, Status: billing_models.StatusActive},
+	}
+	cleaner := CreateTestBackupCleaner(mockBilling)
+	err = cleaner.cleanExceededStorageBackups(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -284,6 +300,7 @@ func Test_CleanExceededBackups_WhenOverLimit_DeletesOldestBackups(t *testing.T) 
 }
 
 func Test_CleanExceededBackups_SkipsInProgressBackups(t *testing.T) {
+	enableCloud(t)
 	router := CreateTestRouter()
 	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
@@ -307,20 +324,21 @@ func Test_CleanExceededBackups_SkipsInProgressBackups(t *testing.T) {
 	interval := createTestInterval()
 
 	backupConfig := &backups_config.BackupConfig{
-		DatabaseID:            database.ID,
-		IsBackupsEnabled:      true,
-		RetentionPolicyType:   backups_config.RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   period.PeriodForever,
-		StorageID:             &storage.ID,
-		MaxBackupsTotalSizeMB: 50,
-		BackupIntervalID:      interval.ID,
-		BackupInterval:        interval,
+		DatabaseID:          database.ID,
+		IsBackupsEnabled:    true,
+		RetentionPolicyType: backups_config.RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.PeriodForever,
+		StorageID:           &storage.ID,
+		BackupIntervalID:    interval.ID,
+		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
 
+	// 3 completed at 500 MB each = 1500 MB, limit = 1 GB (1024 MB)
 	completedBackups := make([]*backups_core.Backup, 3)
 	for i := 0; i < 3; i++ {
 		backup := &backups_core.Backup{
@@ -328,7 +346,7 @@ func Test_CleanExceededBackups_SkipsInProgressBackups(t *testing.T) {
 			DatabaseID:   database.ID,
 			StorageID:    storage.ID,
 			Status:       backups_core.BackupStatusCompleted,
-			BackupSizeMb: 30,
+			BackupSizeMb: 500,
 			CreatedAt:    now.Add(-time.Duration(3-i) * time.Hour),
 		}
 		err = backupRepository.Save(backup)
@@ -347,8 +365,11 @@ func Test_CleanExceededBackups_SkipsInProgressBackups(t *testing.T) {
 	err = backupRepository.Save(inProgressBackup)
 	assert.NoError(t, err)
 
-	cleaner := GetBackupCleaner()
-	err = cleaner.cleanExceededBackups()
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{StorageGB: 1, Status: billing_models.StatusActive},
+	}
+	cleaner := CreateTestBackupCleaner(mockBilling)
+	err = cleaner.cleanExceededStorageBackups(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -365,7 +386,8 @@ func Test_CleanExceededBackups_SkipsInProgressBackups(t *testing.T) {
 	assert.True(t, inProgressFound, "In-progress backup should not be deleted")
 }
 
-func Test_CleanExceededBackups_WithZeroLimit_SkipsDatabase(t *testing.T) {
+func Test_CleanExceededBackups_WithZeroStorageLimit_RemovesAllBackups(t *testing.T) {
+	enableCloud(t)
 	router := CreateTestRouter()
 	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
@@ -389,14 +411,14 @@ func Test_CleanExceededBackups_WithZeroLimit_SkipsDatabase(t *testing.T) {
 	interval := createTestInterval()
 
 	backupConfig := &backups_config.BackupConfig{
-		DatabaseID:            database.ID,
-		IsBackupsEnabled:      true,
-		RetentionPolicyType:   backups_config.RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   period.PeriodForever,
-		StorageID:             &storage.ID,
-		MaxBackupsTotalSizeMB: 0,
-		BackupIntervalID:      interval.ID,
-		BackupInterval:        interval,
+		DatabaseID:          database.ID,
+		IsBackupsEnabled:    true,
+		RetentionPolicyType: backups_config.RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.PeriodForever,
+		StorageID:           &storage.ID,
+		BackupIntervalID:    interval.ID,
+		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -408,19 +430,23 @@ func Test_CleanExceededBackups_WithZeroLimit_SkipsDatabase(t *testing.T) {
 			StorageID:    storage.ID,
 			Status:       backups_core.BackupStatusCompleted,
 			BackupSizeMb: 100,
-			CreatedAt:    time.Now().UTC().Add(-time.Duration(i) * time.Hour),
+			CreatedAt:    time.Now().UTC().Add(-time.Duration(i+2) * time.Hour),
 		}
 		err = backupRepository.Save(backup)
 		assert.NoError(t, err)
 	}
 
-	cleaner := GetBackupCleaner()
-	err = cleaner.cleanExceededBackups()
+	// StorageGB=0 means no storage allowed — all backups should be removed
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{StorageGB: 0, Status: billing_models.StatusActive},
+	}
+	cleaner := CreateTestBackupCleaner(mockBilling)
+	err = cleaner.cleanExceededStorageBackups(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, 10, len(remainingBackups))
+	assert.Equal(t, 0, len(remainingBackups))
 }
 
 func Test_GetTotalSizeByDatabase_CalculatesCorrectly(t *testing.T) {
@@ -522,6 +548,7 @@ func Test_CleanByCount_KeepsNewestNBackups_DeletesOlder(t *testing.T) {
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -545,7 +572,7 @@ func Test_CleanByCount_KeepsNewestNBackups_DeletesOlder(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -594,6 +621,7 @@ func Test_CleanByCount_WhenUnderLimit_NoBackupsDeleted(t *testing.T) {
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -612,7 +640,7 @@ func Test_CleanByCount_WhenUnderLimit_NoBackupsDeleted(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -651,6 +679,7 @@ func Test_CleanByCount_DoesNotDeleteInProgressBackups(t *testing.T) {
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -682,7 +711,7 @@ func Test_CleanByCount_DoesNotDeleteInProgressBackups(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -776,6 +805,7 @@ func Test_CleanByTimePeriod_SkipsRecentBackup_EvenIfOlderThanRetention(t *testin
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -805,7 +835,7 @@ func Test_CleanByTimePeriod_SkipsRecentBackup_EvenIfOlderThanRetention(t *testin
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -847,6 +877,7 @@ func Test_CleanByCount_SkipsRecentBackup_EvenIfOverLimit(t *testing.T) {
 		StorageID:           &storage.ID,
 		BackupIntervalID:    interval.ID,
 		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -893,7 +924,7 @@ func Test_CleanByCount_SkipsRecentBackup_EvenIfOverLimit(t *testing.T) {
 	}
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanByRetentionPolicy()
+	err = cleaner.cleanByRetentionPolicy(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -914,7 +945,8 @@ func Test_CleanByCount_SkipsRecentBackup_EvenIfOverLimit(t *testing.T) {
 	assert.True(t, remainingIDs[newestBackup.ID], "Newest backup should be preserved")
 }
 
-func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverTotalSizeLimit(t *testing.T) {
+func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverStorageLimit(t *testing.T) {
+	enableCloud(t)
 	router := CreateTestRouter()
 	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
 	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
@@ -937,18 +969,18 @@ func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverTotalSizeLimit(t *testi
 
 	interval := createTestInterval()
 
-	// Total size limit is 10 MB. We have two backups of 8 MB each (16 MB total).
+	// Total size limit = 1 GB (1024 MB). Two backups of 600 MB each (1200 MB total).
 	// The oldest backup was created 30 minutes ago — within the grace period.
 	// The cleaner must stop and leave both backups intact.
 	backupConfig := &backups_config.BackupConfig{
-		DatabaseID:            database.ID,
-		IsBackupsEnabled:      true,
-		RetentionPolicyType:   backups_config.RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   period.PeriodForever,
-		StorageID:             &storage.ID,
-		MaxBackupsTotalSizeMB: 10,
-		BackupIntervalID:      interval.ID,
-		BackupInterval:        interval,
+		DatabaseID:          database.ID,
+		IsBackupsEnabled:    true,
+		RetentionPolicyType: backups_config.RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.PeriodForever,
+		StorageID:           &storage.ID,
+		BackupIntervalID:    interval.ID,
+		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
 	}
 	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
 	assert.NoError(t, err)
@@ -960,7 +992,7 @@ func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverTotalSizeLimit(t *testi
 		DatabaseID:   database.ID,
 		StorageID:    storage.ID,
 		Status:       backups_core.BackupStatusCompleted,
-		BackupSizeMb: 8,
+		BackupSizeMb: 600,
 		CreatedAt:    now.Add(-30 * time.Minute),
 	}
 	newerRecentBackup := &backups_core.Backup{
@@ -968,7 +1000,7 @@ func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverTotalSizeLimit(t *testi
 		DatabaseID:   database.ID,
 		StorageID:    storage.ID,
 		Status:       backups_core.BackupStatusCompleted,
-		BackupSizeMb: 8,
+		BackupSizeMb: 600,
 		CreatedAt:    now.Add(-10 * time.Minute),
 	}
 
@@ -977,8 +1009,11 @@ func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverTotalSizeLimit(t *testi
 	err = backupRepository.Save(newerRecentBackup)
 	assert.NoError(t, err)
 
-	cleaner := GetBackupCleaner()
-	err = cleaner.cleanExceededBackups()
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{StorageGB: 1, Status: billing_models.StatusActive},
+	}
+	cleaner := CreateTestBackupCleaner(mockBilling)
+	err = cleaner.cleanExceededStorageBackups(testLogger())
 	assert.NoError(t, err)
 
 	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
@@ -989,6 +1024,82 @@ func Test_CleanExceededBackups_SkipsRecentBackup_WhenOverTotalSizeLimit(t *testi
 		len(remainingBackups),
 		"Both recent backups must be preserved even though total size exceeds limit",
 	)
+}
+
+func Test_CleanExceededStorageBackups_WhenNonCloud_SkipsCleanup(t *testing.T) {
+	router := CreateTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+	storage := storages.CreateTestStorage(workspace.ID)
+	notifier := notifiers.CreateTestNotifier(workspace.ID)
+	database := databases.CreateTestDatabase(workspace.ID, storage, notifier)
+
+	defer func() {
+		backups, _ := backupRepository.FindByDatabaseID(database.ID)
+		for _, backup := range backups {
+			backupRepository.DeleteByID(backup.ID)
+		}
+
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		notifiers.RemoveTestNotifier(notifier)
+		storages.RemoveTestStorage(storage.ID)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	interval := createTestInterval()
+
+	backupConfig := &backups_config.BackupConfig{
+		DatabaseID:          database.ID,
+		IsBackupsEnabled:    true,
+		RetentionPolicyType: backups_config.RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.PeriodForever,
+		StorageID:           &storage.ID,
+		BackupIntervalID:    interval.ID,
+		BackupInterval:      interval,
+		Encryption:          backups_config.BackupEncryptionEncrypted,
+	}
+	_, err := backups_config.GetBackupConfigService().SaveBackupConfig(backupConfig)
+	assert.NoError(t, err)
+
+	// 5 backups at 500 MB each = 2500 MB, would exceed 1 GB limit in cloud mode
+	now := time.Now().UTC()
+	for i := 0; i < 5; i++ {
+		backup := &backups_core.Backup{
+			ID:           uuid.New(),
+			DatabaseID:   database.ID,
+			StorageID:    storage.ID,
+			Status:       backups_core.BackupStatusCompleted,
+			BackupSizeMb: 500,
+			CreatedAt:    now.Add(-time.Duration(i+2) * time.Hour),
+		}
+		err = backupRepository.Save(backup)
+		assert.NoError(t, err)
+	}
+
+	// IsCloud is false by default — cleaner should skip entirely
+	mockBilling := &mockBillingService{
+		subscription: &billing_models.Subscription{StorageGB: 1, Status: billing_models.StatusActive},
+	}
+	cleaner := CreateTestBackupCleaner(mockBilling)
+	err = cleaner.cleanExceededStorageBackups(testLogger())
+	assert.NoError(t, err)
+
+	remainingBackups, err := backupRepository.FindByDatabaseID(database.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, 5, len(remainingBackups), "All backups must remain in non-cloud mode")
+}
+
+type mockBillingService struct {
+	subscription *billing_models.Subscription
+	err          error
+}
+
+func (m *mockBillingService) GetSubscription(
+	logger *slog.Logger,
+	databaseID uuid.UUID,
+) (*billing_models.Subscription, error) {
+	return m.subscription, m.err
 }
 
 // Mock listener for testing
@@ -1041,7 +1152,7 @@ func Test_CleanStaleUploadedBasebackups_MarksAsFailed(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanStaleUploadedBasebackups()
+	err = cleaner.cleanStaleUploadedBasebackups(testLogger())
 	assert.NoError(t, err)
 
 	updated, err := backupRepository.FindByID(staleBackup.ID)
@@ -1088,7 +1199,7 @@ func Test_CleanStaleUploadedBasebackups_SkipsRecentUploads(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanStaleUploadedBasebackups()
+	err = cleaner.cleanStaleUploadedBasebackups(testLogger())
 	assert.NoError(t, err)
 
 	updated, err := backupRepository.FindByID(recentBackup.ID)
@@ -1131,7 +1242,7 @@ func Test_CleanStaleUploadedBasebackups_SkipsActiveStreaming(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanStaleUploadedBasebackups()
+	err = cleaner.cleanStaleUploadedBasebackups(testLogger())
 	assert.NoError(t, err)
 
 	updated, err := backupRepository.FindByID(activeBackup.ID)
@@ -1179,7 +1290,7 @@ func Test_CleanStaleUploadedBasebackups_CleansStorageFiles(t *testing.T) {
 	assert.NoError(t, err)
 
 	cleaner := GetBackupCleaner()
-	err = cleaner.cleanStaleUploadedBasebackups()
+	err = cleaner.cleanStaleUploadedBasebackups(testLogger())
 	assert.NoError(t, err)
 
 	updated, err := backupRepository.FindByID(staleBackup.ID)
@@ -1187,6 +1298,18 @@ func Test_CleanStaleUploadedBasebackups_CleansStorageFiles(t *testing.T) {
 	assert.Equal(t, backups_core.BackupStatusFailed, updated.Status)
 	assert.NotNil(t, updated.FailMessage)
 	assert.Contains(t, *updated.FailMessage, "finalization timed out")
+}
+
+func enableCloud(t *testing.T) {
+	t.Helper()
+	config.GetEnv().IsCloud = true
+	t.Cleanup(func() {
+		config.GetEnv().IsCloud = false
+	})
+}
+
+func testLogger() *slog.Logger {
+	return logger.GetLogger().With("task_name", "test")
 }
 
 func createTestInterval() *intervals.Interval {

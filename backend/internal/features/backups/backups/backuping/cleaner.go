@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"databasus-backend/internal/config"
 	backups_core "databasus-backend/internal/features/backups/backups/core"
 	backups_config "databasus-backend/internal/features/backups/config"
 	"databasus-backend/internal/features/storages"
@@ -26,6 +27,7 @@ type BackupCleaner struct {
 	backupRepository      *backups_core.BackupRepository
 	storageService        *storages.StorageService
 	backupConfigService   *backups_config.BackupConfigService
+	billingService        BillingService
 	fieldEncryptor        util_encryption.FieldEncryptor
 	logger                *slog.Logger
 	backupRemoveListeners []backups_core.BackupRemoveListener
@@ -44,6 +46,10 @@ func (c *BackupCleaner) Run(ctx context.Context) {
 			return
 		}
 
+		retentionLog := c.logger.With("task_name", "clean_by_retention_policy")
+		exceededLog := c.logger.With("task_name", "clean_exceeded_storage_backups")
+		staleLog := c.logger.With("task_name", "clean_stale_basebackups")
+
 		ticker := time.NewTicker(cleanerTickerInterval)
 		defer ticker.Stop()
 
@@ -52,16 +58,16 @@ func (c *BackupCleaner) Run(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := c.cleanByRetentionPolicy(); err != nil {
-					c.logger.Error("Failed to clean backups by retention policy", "error", err)
+				if err := c.cleanByRetentionPolicy(retentionLog); err != nil {
+					retentionLog.Error("failed to clean backups by retention policy", "error", err)
 				}
 
-				if err := c.cleanExceededBackups(); err != nil {
-					c.logger.Error("Failed to clean exceeded backups", "error", err)
+				if err := c.cleanExceededStorageBackups(exceededLog); err != nil {
+					exceededLog.Error("failed to clean exceeded backups", "error", err)
 				}
 
-				if err := c.cleanStaleUploadedBasebackups(); err != nil {
-					c.logger.Error("Failed to clean stale uploaded basebackups", "error", err)
+				if err := c.cleanStaleUploadedBasebackups(staleLog); err != nil {
+					staleLog.Error("failed to clean stale uploaded basebackups", "error", err)
 				}
 			}
 		}
@@ -104,7 +110,7 @@ func (c *BackupCleaner) AddBackupRemoveListener(listener backups_core.BackupRemo
 	c.backupRemoveListeners = append(c.backupRemoveListeners, listener)
 }
 
-func (c *BackupCleaner) cleanStaleUploadedBasebackups() error {
+func (c *BackupCleaner) cleanStaleUploadedBasebackups(logger *slog.Logger) error {
 	staleBackups, err := c.backupRepository.FindStaleUploadedBasebackups(
 		time.Now().UTC().Add(-10 * time.Minute),
 	)
@@ -113,31 +119,30 @@ func (c *BackupCleaner) cleanStaleUploadedBasebackups() error {
 	}
 
 	for _, backup := range staleBackups {
+		backupLog := logger.With("database_id", backup.DatabaseID, "backup_id", backup.ID)
+
 		staleStorage, storageErr := c.storageService.GetStorageByID(backup.StorageID)
 		if storageErr != nil {
-			c.logger.Error(
-				"Failed to get storage for stale basebackup cleanup",
-				"backupId", backup.ID,
-				"storageId", backup.StorageID,
+			backupLog.Error(
+				"failed to get storage for stale basebackup cleanup",
+				"storage_id", backup.StorageID,
 				"error", storageErr,
 			)
 		} else {
 			if err := staleStorage.DeleteFile(c.fieldEncryptor, backup.FileName); err != nil {
-				c.logger.Error(
-					"Failed to delete stale basebackup file",
-					"backupId", backup.ID,
-					"fileName", backup.FileName,
-					"error", err,
+				backupLog.Error(
+					fmt.Sprintf("failed to delete stale basebackup file: %s", backup.FileName),
+					"error",
+					err,
 				)
 			}
 
 			metadataFileName := backup.FileName + ".metadata"
 			if err := staleStorage.DeleteFile(c.fieldEncryptor, metadataFileName); err != nil {
-				c.logger.Error(
-					"Failed to delete stale basebackup metadata file",
-					"backupId", backup.ID,
-					"fileName", metadataFileName,
-					"error", err,
+				backupLog.Error(
+					fmt.Sprintf("failed to delete stale basebackup metadata file: %s", metadataFileName),
+					"error",
+					err,
 				)
 			}
 		}
@@ -147,77 +152,67 @@ func (c *BackupCleaner) cleanStaleUploadedBasebackups() error {
 		backup.FailMessage = &failMsg
 
 		if err := c.backupRepository.Save(backup); err != nil {
-			c.logger.Error(
-				"Failed to mark stale uploaded basebackup as failed",
-				"backupId", backup.ID,
-				"error", err,
-			)
+			backupLog.Error("failed to mark stale uploaded basebackup as failed", "error", err)
 			continue
 		}
 
-		c.logger.Info(
-			"Marked stale uploaded basebackup as failed and cleaned storage",
-			"backupId", backup.ID,
-			"databaseId", backup.DatabaseID,
-		)
+		backupLog.Info("marked stale uploaded basebackup as failed and cleaned storage")
 	}
 
 	return nil
 }
 
-func (c *BackupCleaner) cleanByRetentionPolicy() error {
+func (c *BackupCleaner) cleanByRetentionPolicy(logger *slog.Logger) error {
 	enabledBackupConfigs, err := c.backupConfigService.GetBackupConfigsWithEnabledBackups()
 	if err != nil {
 		return err
 	}
 
 	for _, backupConfig := range enabledBackupConfigs {
+		dbLog := logger.With("database_id", backupConfig.DatabaseID, "policy", backupConfig.RetentionPolicyType)
+
 		var cleanErr error
 
 		switch backupConfig.RetentionPolicyType {
 		case backups_config.RetentionPolicyTypeCount:
-			cleanErr = c.cleanByCount(backupConfig)
+			cleanErr = c.cleanByCount(dbLog, backupConfig)
 		case backups_config.RetentionPolicyTypeGFS:
-			cleanErr = c.cleanByGFS(backupConfig)
+			cleanErr = c.cleanByGFS(dbLog, backupConfig)
 		default:
-			cleanErr = c.cleanByTimePeriod(backupConfig)
+			cleanErr = c.cleanByTimePeriod(dbLog, backupConfig)
 		}
 
 		if cleanErr != nil {
-			c.logger.Error(
-				"Failed to clean backups by retention policy",
-				"databaseId", backupConfig.DatabaseID,
-				"policy", backupConfig.RetentionPolicyType,
-				"error", cleanErr,
-			)
+			dbLog.Error("failed to clean backups by retention policy", "error", cleanErr)
 		}
 	}
 
 	return nil
 }
 
-func (c *BackupCleaner) cleanExceededBackups() error {
+func (c *BackupCleaner) cleanExceededStorageBackups(logger *slog.Logger) error {
+	if !config.GetEnv().IsCloud {
+		return nil
+	}
+
 	enabledBackupConfigs, err := c.backupConfigService.GetBackupConfigsWithEnabledBackups()
 	if err != nil {
 		return err
 	}
 
 	for _, backupConfig := range enabledBackupConfigs {
-		if backupConfig.MaxBackupsTotalSizeMB <= 0 {
+		dbLog := logger.With("database_id", backupConfig.DatabaseID)
+
+		subscription, subErr := c.billingService.GetSubscription(dbLog, backupConfig.DatabaseID)
+		if subErr != nil {
+			dbLog.Error("failed to get subscription for exceeded backups check", "error", subErr)
 			continue
 		}
 
-		if err := c.cleanExceededBackupsForDatabase(
-			backupConfig.DatabaseID,
-			backupConfig.MaxBackupsTotalSizeMB,
-		); err != nil {
-			c.logger.Error(
-				"Failed to clean exceeded backups for database",
-				"databaseId",
-				backupConfig.DatabaseID,
-				"error",
-				err,
-			)
+		storageLimitMB := int64(subscription.GetBackupsStorageGB()) * 1024
+
+		if err := c.cleanExceededBackupsForDatabase(dbLog, backupConfig.DatabaseID, storageLimitMB); err != nil {
+			dbLog.Error("failed to clean exceeded backups for database", "error", err)
 			continue
 		}
 	}
@@ -225,7 +220,7 @@ func (c *BackupCleaner) cleanExceededBackups() error {
 	return nil
 }
 
-func (c *BackupCleaner) cleanByTimePeriod(backupConfig *backups_config.BackupConfig) error {
+func (c *BackupCleaner) cleanByTimePeriod(logger *slog.Logger, backupConfig *backups_config.BackupConfig) error {
 	if backupConfig.RetentionTimePeriod == "" {
 		return nil
 	}
@@ -255,21 +250,17 @@ func (c *BackupCleaner) cleanByTimePeriod(backupConfig *backups_config.BackupCon
 		}
 
 		if err := c.DeleteBackup(backup); err != nil {
-			c.logger.Error("Failed to delete old backup", "backupId", backup.ID, "error", err)
+			logger.Error("failed to delete old backup", "backup_id", backup.ID, "error", err)
 			continue
 		}
 
-		c.logger.Info(
-			"Deleted old backup",
-			"backupId", backup.ID,
-			"databaseId", backupConfig.DatabaseID,
-		)
+		logger.Info("deleted old backup", "backup_id", backup.ID)
 	}
 
 	return nil
 }
 
-func (c *BackupCleaner) cleanByCount(backupConfig *backups_config.BackupConfig) error {
+func (c *BackupCleaner) cleanByCount(logger *slog.Logger, backupConfig *backups_config.BackupConfig) error {
 	if backupConfig.RetentionCount <= 0 {
 		return nil
 	}
@@ -298,28 +289,20 @@ func (c *BackupCleaner) cleanByCount(backupConfig *backups_config.BackupConfig) 
 		}
 
 		if err := c.DeleteBackup(backup); err != nil {
-			c.logger.Error(
-				"Failed to delete backup by count policy",
-				"backupId",
-				backup.ID,
-				"error",
-				err,
-			)
+			logger.Error("failed to delete backup by count policy", "backup_id", backup.ID, "error", err)
 			continue
 		}
 
-		c.logger.Info(
-			"Deleted backup by count policy",
-			"backupId", backup.ID,
-			"databaseId", backupConfig.DatabaseID,
-			"retentionCount", backupConfig.RetentionCount,
+		logger.Info(
+			fmt.Sprintf("deleted backup by count policy: retention count is %d", backupConfig.RetentionCount),
+			"backup_id", backup.ID,
 		)
 	}
 
 	return nil
 }
 
-func (c *BackupCleaner) cleanByGFS(backupConfig *backups_config.BackupConfig) error {
+func (c *BackupCleaner) cleanByGFS(logger *slog.Logger, backupConfig *backups_config.BackupConfig) error {
 	if backupConfig.RetentionGfsHours <= 0 && backupConfig.RetentionGfsDays <= 0 &&
 		backupConfig.RetentionGfsWeeks <= 0 && backupConfig.RetentionGfsMonths <= 0 &&
 		backupConfig.RetentionGfsYears <= 0 {
@@ -357,29 +340,20 @@ func (c *BackupCleaner) cleanByGFS(backupConfig *backups_config.BackupConfig) er
 		}
 
 		if err := c.DeleteBackup(backup); err != nil {
-			c.logger.Error(
-				"Failed to delete backup by GFS policy",
-				"backupId",
-				backup.ID,
-				"error",
-				err,
-			)
+			logger.Error("failed to delete backup by GFS policy", "backup_id", backup.ID, "error", err)
 			continue
 		}
 
-		c.logger.Info(
-			"Deleted backup by GFS policy",
-			"backupId", backup.ID,
-			"databaseId", backupConfig.DatabaseID,
-		)
+		logger.Info("deleted backup by GFS policy", "backup_id", backup.ID)
 	}
 
 	return nil
 }
 
 func (c *BackupCleaner) cleanExceededBackupsForDatabase(
+	logger *slog.Logger,
 	databaseID uuid.UUID,
-	limitperDbMB int64,
+	limitPerDbMB int64,
 ) error {
 	for {
 		backupsTotalSizeMB, err := c.backupRepository.GetTotalSizeByDatabase(databaseID)
@@ -387,7 +361,7 @@ func (c *BackupCleaner) cleanExceededBackupsForDatabase(
 			return err
 		}
 
-		if backupsTotalSizeMB <= float64(limitperDbMB) {
+		if backupsTotalSizeMB <= float64(limitPerDbMB) {
 			break
 		}
 
@@ -400,59 +374,27 @@ func (c *BackupCleaner) cleanExceededBackupsForDatabase(
 		}
 
 		if len(oldestBackups) == 0 {
-			c.logger.Warn(
-				"No backups to delete but still over limit",
-				"databaseId",
-				databaseID,
-				"totalSizeMB",
-				backupsTotalSizeMB,
-				"limitMB",
-				limitperDbMB,
-			)
+			logger.Warn(fmt.Sprintf(
+				"no backups to delete but still over limit: total size is %.1f MB, limit is %d MB",
+				backupsTotalSizeMB, limitPerDbMB,
+			))
 			break
 		}
 
 		backup := oldestBackups[0]
 		if isRecentBackup(backup) {
-			c.logger.Warn(
-				"Oldest backup is too recent to delete, stopping size cleanup",
-				"databaseId",
-				databaseID,
-				"backupId",
-				backup.ID,
-				"totalSizeMB",
-				backupsTotalSizeMB,
-				"limitMB",
-				limitperDbMB,
-			)
 			break
 		}
 
 		if err := c.DeleteBackup(backup); err != nil {
-			c.logger.Error(
-				"Failed to delete exceeded backup",
-				"backupId",
-				backup.ID,
-				"databaseId",
-				databaseID,
-				"error",
-				err,
-			)
+			logger.Error("failed to delete exceeded backup", "backup_id", backup.ID, "error", err)
 			return err
 		}
 
-		c.logger.Info(
-			"Deleted exceeded backup",
-			"backupId",
-			backup.ID,
-			"databaseId",
-			databaseID,
-			"backupSizeMB",
-			backup.BackupSizeMb,
-			"totalSizeMB",
-			backupsTotalSizeMB,
-			"limitMB",
-			limitperDbMB,
+		logger.Info(
+			fmt.Sprintf("deleted exceeded backup: backup size is %.1f MB, total size is %.1f MB, limit is %d MB",
+				backup.BackupSizeMb, backupsTotalSizeMB, limitPerDbMB),
+			"backup_id", backup.ID,
 		)
 	}
 

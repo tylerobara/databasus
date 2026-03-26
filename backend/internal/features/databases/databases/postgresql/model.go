@@ -81,8 +81,8 @@ func (p *PostgresqlDatabase) Validate() error {
 		p.BackupType = PostgresBackupTypePgDump
 	}
 
-	if p.BackupType == PostgresBackupTypePgDump && config.GetEnv().IsCloud {
-		return errors.New("PG_DUMP backup type is not supported in cloud mode")
+	if p.BackupType != PostgresBackupTypePgDump && config.GetEnv().IsCloud {
+		return errors.New("only PG_DUMP backup type is supported in cloud mode")
 	}
 
 	if p.BackupType == PostgresBackupTypePgDump {

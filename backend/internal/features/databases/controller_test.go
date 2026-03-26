@@ -1328,6 +1328,143 @@ func getTestPostgresConfig() *postgresql.PostgresqlDatabase {
 	}
 }
 
+func Test_CreateDatabase_WhenCloudAndUserIsNotReadOnly_ReturnsBadRequest(t *testing.T) {
+	enableCloud(t)
+
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Cloud Not ReadOnly", owner, router)
+	defer workspaces_testing.RemoveTestWorkspace(workspace, router)
+
+	request := Database{
+		Name:        "Cloud Non-ReadOnly DB",
+		WorkspaceID: &workspace.ID,
+		Type:        DatabaseTypePostgres,
+		Postgresql:  getTestPostgresConfig(),
+	}
+
+	resp := test_utils.MakePostRequest(
+		t,
+		router,
+		"/api/v1/databases/create",
+		"Bearer "+owner.Token,
+		request,
+		http.StatusBadRequest,
+	)
+
+	assert.Contains(t, string(resp.Body), "in cloud mode, only read-only database users are allowed")
+}
+
+func Test_CreateDatabase_WhenCloudAndUserIsReadOnly_DatabaseCreated(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Cloud ReadOnly", owner, router)
+	defer workspaces_testing.RemoveTestWorkspace(workspace, router)
+
+	database := createTestDatabaseViaAPI("Temp DB for RO User", workspace.ID, owner.Token, router)
+
+	readOnlyUser := createReadOnlyUserViaAPI(t, router, database.ID, owner.Token)
+	assert.NotEmpty(t, readOnlyUser.Username)
+	assert.NotEmpty(t, readOnlyUser.Password)
+
+	RemoveTestDatabase(database)
+
+	enableCloud(t)
+
+	pgConfig := getTestPostgresConfig()
+	pgConfig.Username = readOnlyUser.Username
+	pgConfig.Password = readOnlyUser.Password
+
+	request := Database{
+		Name:        "Cloud ReadOnly DB",
+		WorkspaceID: &workspace.ID,
+		Type:        DatabaseTypePostgres,
+		Postgresql:  pgConfig,
+	}
+
+	var response Database
+	test_utils.MakePostRequestAndUnmarshal(
+		t,
+		router,
+		"/api/v1/databases/create",
+		"Bearer "+owner.Token,
+		request,
+		http.StatusCreated,
+		&response,
+	)
+	defer RemoveTestDatabase(&response)
+
+	assert.Equal(t, "Cloud ReadOnly DB", response.Name)
+	assert.NotEqual(t, uuid.Nil, response.ID)
+}
+
+func Test_CreateDatabase_WhenNotCloudAndUserIsNotReadOnly_DatabaseCreated(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Non-Cloud", owner, router)
+	defer workspaces_testing.RemoveTestWorkspace(workspace, router)
+
+	request := Database{
+		Name:        "Non-Cloud DB",
+		WorkspaceID: &workspace.ID,
+		Type:        DatabaseTypePostgres,
+		Postgresql:  getTestPostgresConfig(),
+	}
+
+	var response Database
+	test_utils.MakePostRequestAndUnmarshal(
+		t,
+		router,
+		"/api/v1/databases/create",
+		"Bearer "+owner.Token,
+		request,
+		http.StatusCreated,
+		&response,
+	)
+	defer RemoveTestDatabase(&response)
+
+	assert.Equal(t, "Non-Cloud DB", response.Name)
+	assert.NotEqual(t, uuid.Nil, response.ID)
+}
+
+func enableCloud(t *testing.T) {
+	t.Helper()
+	config.GetEnv().IsCloud = true
+	t.Cleanup(func() {
+		config.GetEnv().IsCloud = false
+	})
+}
+
+func createReadOnlyUserViaAPI(
+	t *testing.T,
+	router *gin.Engine,
+	databaseID uuid.UUID,
+	token string,
+) *CreateReadOnlyUserResponse {
+	var database Database
+	test_utils.MakeGetRequestAndUnmarshal(
+		t,
+		router,
+		fmt.Sprintf("/api/v1/databases/%s", databaseID.String()),
+		"Bearer "+token,
+		http.StatusOK,
+		&database,
+	)
+
+	var response CreateReadOnlyUserResponse
+	test_utils.MakePostRequestAndUnmarshal(
+		t,
+		router,
+		"/api/v1/databases/create-readonly-user",
+		"Bearer "+token,
+		database,
+		http.StatusOK,
+		&response,
+	)
+
+	return &response
+}
+
 func getTestMariadbConfig() *mariadb.MariadbDatabase {
 	env := config.GetEnv()
 	portStr := env.TestMariadb1011Port

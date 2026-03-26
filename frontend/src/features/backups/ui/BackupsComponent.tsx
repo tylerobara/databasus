@@ -14,6 +14,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 
+import { IS_CLOUD } from '../../../constants';
 import {
   type Backup,
   type BackupConfig,
@@ -28,6 +29,7 @@ import { getUserTimeFormat } from '../../../shared/time';
 import { ConfirmationComponent } from '../../../shared/ui';
 import { RestoresComponent } from '../../restores';
 import { AgentRestoreComponent } from './AgentRestoreComponent';
+import { BackupsBillingBannerComponent } from './BackupsBillingBannerComponent';
 
 const BACKUPS_PAGE_SIZE = 50;
 
@@ -36,6 +38,7 @@ interface Props {
   isCanManageDBs: boolean;
   isDirectlyUnderTab?: boolean;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  onNavigateToBilling?: () => void;
 }
 
 export const BackupsComponent = ({
@@ -43,6 +46,7 @@ export const BackupsComponent = ({
   isCanManageDBs,
   isDirectlyUnderTab,
   scrollContainerRef,
+  onNavigateToBilling,
 }: Props) => {
   const [isBackupsLoading, setIsBackupsLoading] = useState(false);
   const [backups, setBackups] = useState<Backup[]>([]);
@@ -509,6 +513,14 @@ export const BackupsComponent = ({
       className={`w-full bg-white p-3 shadow md:p-5 dark:bg-gray-800 ${isDirectlyUnderTab ? 'rounded-tr-md rounded-br-md rounded-bl-md' : 'rounded-md'}`}
     >
       <h2 className="text-lg font-bold md:text-xl dark:text-white">Backups</h2>
+
+      {IS_CLOUD && (
+        <BackupsBillingBannerComponent
+          databaseId={database.id}
+          isCanManageDBs={isCanManageDBs}
+          onNavigateToBilling={onNavigateToBilling}
+        />
+      )}
 
       {!isBackupConfigLoading && !backupConfig?.isBackupsEnabled && (
         <div className="text-sm text-red-600">

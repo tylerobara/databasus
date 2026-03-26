@@ -16,7 +16,6 @@ type BackupConfigController struct {
 
 func (c *BackupConfigController) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/backup-configs/save", c.SaveBackupConfig)
-	router.GET("/backup-configs/database/:id/plan", c.GetDatabasePlan)
 	router.GET("/backup-configs/database/:id", c.GetBackupConfigByDbID)
 	router.GET("/backup-configs/storage/:id/is-using", c.IsStorageUsing)
 	router.GET("/backup-configs/storage/:id/databases-count", c.CountDatabasesForStorage)
@@ -91,39 +90,6 @@ func (c *BackupConfigController) GetBackupConfigByDbID(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, backupConfig)
-}
-
-// GetDatabasePlan
-// @Summary Get database plan by database ID
-// @Description Get the plan limits for a specific database (max backup size, max total size, max storage period)
-// @Tags backup-configs
-// @Produce json
-// @Param id path string true "Database ID"
-// @Success 200 {object} plans.DatabasePlan
-// @Failure 400 {object} map[string]string "Invalid database ID"
-// @Failure 401 {object} map[string]string "User not authenticated"
-// @Failure 404 {object} map[string]string "Database not found or access denied"
-// @Router /backup-configs/database/{id}/plan [get]
-func (c *BackupConfigController) GetDatabasePlan(ctx *gin.Context) {
-	user, ok := users_middleware.GetUserFromContext(ctx)
-	if !ok {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	id, err := uuid.Parse(ctx.Param("id"))
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid database ID"})
-		return
-	}
-
-	plan, err := c.backupConfigService.GetDatabasePlan(user, id)
-	if err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "database plan not found"})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, plan)
 }
 
 // IsStorageUsing

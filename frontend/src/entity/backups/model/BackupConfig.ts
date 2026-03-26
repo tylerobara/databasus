@@ -25,7 +25,4 @@ export interface BackupConfig {
   isRetryIfFailed: boolean;
   maxFailedTriesCount: number;
   encryption: BackupEncryption;
-
-  maxBackupSizeMb: number;
-  maxBackupsTotalSizeMb: number;
 }

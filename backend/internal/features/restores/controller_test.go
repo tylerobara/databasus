@@ -775,7 +775,123 @@ func cleanupDatabaseWithBackup(database *databases.Database, backup *backups_cor
 	}
 }
 
+func Test_RestoreBackup_WhenCloudAndCpuCountMoreThanOne_ReturnsBadRequest(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+	defer workspaces_testing.RemoveTestWorkspace(workspace, router)
+
+	database, backup := createTestDatabaseWithBackupForRestore(workspace, owner, router)
+	defer cleanupDatabaseWithBackup(database, backup)
+
+	enableCloud(t)
+
+	request := restores_core.RestoreBackupRequest{
+		PostgresqlDatabase: &postgresql.PostgresqlDatabase{
+			Version:  tools.PostgresqlVersion16,
+			Host:     env_config.GetEnv().TestLocalhost,
+			Port:     5432,
+			Username: "postgres",
+			Password: "postgres",
+			CpuCount: 4,
+		},
+	}
+
+	testResp := test_utils.MakePostRequest(
+		t,
+		router,
+		fmt.Sprintf("/api/v1/restores/%s/restore", backup.ID.String()),
+		"Bearer "+owner.Token,
+		request,
+		http.StatusBadRequest,
+	)
+
+	assert.Contains(t, string(testResp.Body), "multi-thread restore is not supported in cloud mode")
+}
+
+func Test_RestoreBackup_WhenCloudAndCpuCountIsOne_RestoreInitiated(t *testing.T) {
+	router := createTestRouter()
+
+	_, cleanup := SetupMockRestoreNode(t)
+	defer cleanup()
+
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+	defer workspaces_testing.RemoveTestWorkspace(workspace, router)
+
+	database, backup := createTestDatabaseWithBackupForRestore(workspace, owner, router)
+	defer cleanupDatabaseWithBackup(database, backup)
+
+	enableCloud(t)
+
+	request := restores_core.RestoreBackupRequest{
+		PostgresqlDatabase: &postgresql.PostgresqlDatabase{
+			Version:  tools.PostgresqlVersion16,
+			Host:     env_config.GetEnv().TestLocalhost,
+			Port:     5432,
+			Username: "postgres",
+			Password: "postgres",
+			CpuCount: 1,
+		},
+	}
+
+	testResp := test_utils.MakePostRequest(
+		t,
+		router,
+		fmt.Sprintf("/api/v1/restores/%s/restore", backup.ID.String()),
+		"Bearer "+owner.Token,
+		request,
+		http.StatusOK,
+	)
+
+	assert.Contains(t, string(testResp.Body), "restore started successfully")
+}
+
+func Test_RestoreBackup_WhenNotCloudAndCpuCountMoreThanOne_RestoreInitiated(t *testing.T) {
+	router := createTestRouter()
+
+	_, cleanup := SetupMockRestoreNode(t)
+	defer cleanup()
+
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+	defer workspaces_testing.RemoveTestWorkspace(workspace, router)
+
+	database, backup := createTestDatabaseWithBackupForRestore(workspace, owner, router)
+	defer cleanupDatabaseWithBackup(database, backup)
+
+	request := restores_core.RestoreBackupRequest{
+		PostgresqlDatabase: &postgresql.PostgresqlDatabase{
+			Version:  tools.PostgresqlVersion16,
+			Host:     env_config.GetEnv().TestLocalhost,
+			Port:     5432,
+			Username: "postgres",
+			Password: "postgres",
+			CpuCount: 4,
+		},
+	}
+
+	testResp := test_utils.MakePostRequest(
+		t,
+		router,
+		fmt.Sprintf("/api/v1/restores/%s/restore", backup.ID.String()),
+		"Bearer "+owner.Token,
+		request,
+		http.StatusOK,
+	)
+
+	assert.Contains(t, string(testResp.Body), "restore started successfully")
+}
+
 func cleanupBackup(backup *backups_core.Backup) {
 	repo := &backups_core.BackupRepository{}
 	repo.DeleteByID(backup.ID)
+}
+
+func enableCloud(t *testing.T) {
+	t.Helper()
+	env_config.GetEnv().IsCloud = true
+	t.Cleanup(func() {
+		env_config.GetEnv().IsCloud = false
+	})
 }

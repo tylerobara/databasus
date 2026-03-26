@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
@@ -52,6 +53,20 @@ type EnvVariables struct {
 	DataFolder    string
 	TempFolder    string
 	SecretKeyPath string
+
+	// Billing (always tax-exclusive)
+	PricePerGBCents int64 `env:"PRICE_PER_GB_CENTS"`
+	MinStorageGB    int
+	MaxStorageGB    int
+	TrialDuration   time.Duration
+	TrialStorageGB  int
+	GracePeriod     time.Duration
+	// Paddle billing
+	IsPaddleSandbox     bool   `env:"IS_PADDLE_SANDBOX"`
+	PaddleApiKey        string `env:"PADDLE_API_KEY"`
+	PaddleWebhookSecret string `env:"PADDLE_WEBHOOK_SECRET"`
+	PaddlePriceID       string `env:"PADDLE_PRICE_ID"`
+	PaddleClientToken   string `env:"PADDLE_CLIENT_TOKEN"`
 
 	TestGoogleDriveClientID     string `env:"TEST_GOOGLE_DRIVE_CLIENT_ID"`
 	TestGoogleDriveClientSecret string `env:"TEST_GOOGLE_DRIVE_CLIENT_SECRET"`
@@ -132,9 +147,9 @@ var (
 	once sync.Once
 )
 
-func GetEnv() EnvVariables {
+func GetEnv() *EnvVariables {
 	once.Do(loadEnvVariables)
-	return env
+	return &env
 }
 
 func loadEnvVariables() {
@@ -362,6 +377,40 @@ func loadEnvVariables() {
 		}
 
 	}
+
+	// Billing
+	if env.IsCloud {
+		if env.PricePerGBCents == 0 {
+			log.Error("PRICE_PER_GB_CENTS is empty or zero")
+			os.Exit(1)
+		}
+
+		if env.PaddleApiKey == "" {
+			log.Error("PADDLE_API_KEY is empty")
+			os.Exit(1)
+		}
+
+		if env.PaddleWebhookSecret == "" {
+			log.Error("PADDLE_WEBHOOK_SECRET is empty")
+			os.Exit(1)
+		}
+
+		if env.PaddlePriceID == "" {
+			log.Error("PADDLE_PRICE_ID is empty")
+			os.Exit(1)
+		}
+
+		if env.PaddleClientToken == "" {
+			log.Error("PADDLE_CLIENT_TOKEN is empty")
+			os.Exit(1)
+		}
+	}
+
+	env.MinStorageGB = 20
+	env.MaxStorageGB = 10_000
+	env.TrialDuration = 24 * time.Hour
+	env.TrialStorageGB = 20
+	env.GracePeriod = 30 * 24 * time.Hour
 
 	log.Info("Environment variables loaded successfully!")
 }

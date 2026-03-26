@@ -8,10 +8,10 @@ import (
 	"databasus-backend/internal/features/databases"
 	"databasus-backend/internal/features/intervals"
 	"databasus-backend/internal/features/notifiers"
-	plans "databasus-backend/internal/features/plan"
 	"databasus-backend/internal/features/storages"
 	users_models "databasus-backend/internal/features/users/models"
 	workspaces_services "databasus-backend/internal/features/workspaces/services"
+	"databasus-backend/internal/util/period"
 )
 
 type BackupConfigService struct {
@@ -20,7 +20,6 @@ type BackupConfigService struct {
 	storageService         *storages.StorageService
 	notifierService        *notifiers.NotifierService
 	workspaceService       *workspaces_services.WorkspaceService
-	databasePlanService    *plans.DatabasePlanService
 
 	dbStorageChangeListener BackupConfigStorageChangeListener
 }
@@ -46,12 +45,7 @@ func (s *BackupConfigService) SaveBackupConfigWithAuth(
 	user *users_models.User,
 	backupConfig *BackupConfig,
 ) (*BackupConfig, error) {
-	plan, err := s.databasePlanService.GetDatabasePlan(backupConfig.DatabaseID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := backupConfig.Validate(plan); err != nil {
+	if err := backupConfig.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -88,12 +82,7 @@ func (s *BackupConfigService) SaveBackupConfigWithAuth(
 func (s *BackupConfigService) SaveBackupConfig(
 	backupConfig *BackupConfig,
 ) (*BackupConfig, error) {
-	plan, err := s.databasePlanService.GetDatabasePlan(backupConfig.DatabaseID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := backupConfig.Validate(plan); err != nil {
+	if err := backupConfig.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -129,18 +118,6 @@ func (s *BackupConfigService) GetBackupConfigByDbIdWithAuth(
 	}
 
 	return s.GetBackupConfigByDbId(databaseID)
-}
-
-func (s *BackupConfigService) GetDatabasePlan(
-	user *users_models.User,
-	databaseID uuid.UUID,
-) (*plans.DatabasePlan, error) {
-	_, err := s.databaseService.GetDatabase(user, databaseID)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.databasePlanService.GetDatabasePlan(databaseID)
 }
 
 func (s *BackupConfigService) GetBackupConfigByDbId(
@@ -322,20 +299,13 @@ func (s *BackupConfigService) TransferDatabaseToWorkspace(
 func (s *BackupConfigService) initializeDefaultConfig(
 	databaseID uuid.UUID,
 ) error {
-	plan, err := s.databasePlanService.GetDatabasePlan(databaseID)
-	if err != nil {
-		return err
-	}
-
 	timeOfDay := "04:00"
 
-	_, err = s.backupConfigRepository.Save(&BackupConfig{
-		DatabaseID:            databaseID,
-		IsBackupsEnabled:      false,
-		RetentionPolicyType:   RetentionPolicyTypeTimePeriod,
-		RetentionTimePeriod:   plan.MaxStoragePeriod,
-		MaxBackupSizeMB:       plan.MaxBackupSizeMB,
-		MaxBackupsTotalSizeMB: plan.MaxBackupsTotalSizeMB,
+	_, err := s.backupConfigRepository.Save(&BackupConfig{
+		DatabaseID:          databaseID,
+		IsBackupsEnabled:    false,
+		RetentionPolicyType: RetentionPolicyTypeTimePeriod,
+		RetentionTimePeriod: period.Period3Month,
 		BackupInterval: &intervals.Interval{
 			Interval:  intervals.IntervalDaily,
 			TimeOfDay: &timeOfDay,

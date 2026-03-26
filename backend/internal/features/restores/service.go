@@ -129,11 +129,14 @@ func (s *RestoreService) RestoreBackupWithAuth(
 		return err
 	}
 
-	if config.GetEnv().IsCloud {
-		// in cloud mode we use only single thread mode,
-		// because otherwise we will exhaust local storage
-		// space (instead of streaming from S3 directly to DB)
-		requestDTO.PostgresqlDatabase.CpuCount = 1
+	if config.GetEnv().IsCloud && requestDTO.PostgresqlDatabase != nil &&
+		requestDTO.PostgresqlDatabase.CpuCount > 1 {
+		s.logger.Warn("restore rejected: multi-thread mode not supported in cloud",
+			"requested_cpu_count", requestDTO.PostgresqlDatabase.CpuCount)
+
+		return errors.New(
+			"multi-thread restore is not supported in cloud mode, only single thread (CPU=1) is allowed",
+		)
 	}
 
 	if err := s.validateVersionCompatibility(backupDatabase, requestDTO); err != nil {

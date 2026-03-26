@@ -1263,7 +1263,7 @@ func Test_MakeBackup_VerifyBackupAndMetadataFilesExistInStorage(t *testing.T) {
 	backuperCancel := backuping.StartBackuperNodeForTest(t, backuperNode)
 	defer backuping.StopBackuperNodeForTest(t, backuperCancel, backuperNode)
 
-	scheduler := backuping.CreateTestScheduler()
+	scheduler := backuping.CreateTestScheduler(nil)
 	schedulerCancel := backuping.StartSchedulerForTest(t, scheduler)
 	defer schedulerCancel()
 
@@ -1838,7 +1838,7 @@ func Test_DeleteBackup_RemovesBackupAndMetadataFilesFromDisk(t *testing.T) {
 	backuperCancel := backuping.StartBackuperNodeForTest(t, backuperNode)
 	defer backuping.StopBackuperNodeForTest(t, backuperCancel, backuperNode)
 
-	scheduler := backuping.CreateTestScheduler()
+	scheduler := backuping.CreateTestScheduler(nil)
 	schedulerCancel := backuping.StartSchedulerForTest(t, scheduler)
 	defer schedulerCancel()
 
