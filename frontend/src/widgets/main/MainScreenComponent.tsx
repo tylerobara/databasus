@@ -373,11 +373,13 @@ export const MainScreenComponent = () => {
             </>
           )}
 
-          <div className="absolute bottom-1 left-2 mb-[0px] hidden text-sm text-gray-400 md:block">
-            v{APP_VERSION}
-            <br />
-            {CONTAINER_ARCH}
-          </div>
+          {!IS_CLOUD && (
+            <div className="absolute bottom-1 left-2 mb-[0px] hidden text-sm text-gray-400 md:block">
+              v{APP_VERSION}
+              <br />
+              {CONTAINER_ARCH}
+            </div>
+          )}
         </div>
       )}
 

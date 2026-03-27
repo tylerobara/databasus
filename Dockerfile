@@ -335,7 +335,8 @@ fi
 if [ -n "\${CLOUD_PADDLE_CLIENT_TOKEN:-}" ]; then
   if ! grep -q "cdn.paddle.com" /app/ui/build/index.html 2>/dev/null; then
     echo "Injecting Paddle script..."
-    sed -i "s#</head>#  <script src=\"https://cdn.paddle.com/paddle/v2/paddle.js\"></script>\n  </head>#" /app/ui/build/index.html
+    sed -i "s#</head>#  <script src=\"https://cdn.paddle.com/paddle/v2/paddle.js\"></script>\\
+  </head>#" /app/ui/build/index.html
   fi
 fi
 
