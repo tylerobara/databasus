@@ -21,8 +21,10 @@ import (
 const (
 	checkInterval = 30 * time.Second
 	retryDelay    = 1 * time.Minute
-	uploadTimeout = 30 * time.Minute
+	uploadTimeout = 23 * time.Hour
 )
+
+var uploadIdleTimeout = 5 * time.Minute
 
 var retryDelayOverride *time.Duration
 
@@ -176,16 +178,32 @@ func (backuper *FullBackuper) executeAndUploadBasebackup(ctx context.Context) er
 
 	// Phase 1: Stream compressed data via io.Pipe directly to the API.
 	pipeReader, pipeWriter := io.Pipe()
+	defer func() { _ = pipeReader.Close() }()
+
 	go backuper.compressAndStream(pipeWriter, stdoutPipe)
 
-	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
-	defer cancel()
+	uploadCtx, timeoutCancel := context.WithTimeout(ctx, uploadTimeout)
+	defer timeoutCancel()
 
-	uploadResp, uploadErr := backuper.apiClient.UploadBasebackup(uploadCtx, pipeReader)
+	idleCtx, idleCancel := context.WithCancelCause(uploadCtx)
+	defer idleCancel(nil)
+
+	idleReader := api.NewIdleTimeoutReader(pipeReader, uploadIdleTimeout, idleCancel)
+	defer idleReader.Stop()
+
+	uploadResp, uploadErr := backuper.apiClient.UploadBasebackup(idleCtx, idleReader)
+
+	if uploadErr != nil && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
 
 	cmdErr := cmd.Wait()
 
 	if uploadErr != nil {
+		if cause := context.Cause(idleCtx); cause != nil {
+			uploadErr = cause
+		}
+
 		stderrStr := stderrBuf.String()
 		if stderrStr != "" {
 			return fmt.Errorf("upload basebackup: %w (pg_basebackup stderr: %s)", uploadErr, stderrStr)

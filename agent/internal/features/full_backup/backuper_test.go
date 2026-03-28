@@ -562,6 +562,68 @@ func Test_RunFullBackup_WhenUploadSucceeds_BodyIsZstdCompressed(t *testing.T) {
 	assert.Equal(t, originalContent, string(decompressed))
 }
 
+func Test_RunFullBackup_WhenUploadStalls_FailsWithIdleTimeout(t *testing.T) {
+	server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case testFullStartPath:
+			// Server reads body normally — it will block until connection is closed
+			_, _ = io.ReadAll(r.Body)
+			writeJSON(w, map[string]string{"backupId": testBackupID})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	fb := newTestFullBackuper(server.URL)
+	fb.cmdBuilder = stallingCmdBuilder(t)
+
+	origIdleTimeout := uploadIdleTimeout
+	uploadIdleTimeout = 200 * time.Millisecond
+	defer func() { uploadIdleTimeout = origIdleTimeout }()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	err := fb.executeAndUploadBasebackup(ctx)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "idle timeout", "error should mention idle timeout")
+}
+
+func stallingCmdBuilder(t *testing.T) CmdBuilder {
+	t.Helper()
+
+	return func(ctx context.Context) *exec.Cmd {
+		cmd := exec.CommandContext(ctx, os.Args[0],
+			"-test.run=TestHelperProcessStalling",
+			"--",
+		)
+
+		cmd.Env = append(os.Environ(), "GO_TEST_HELPER_PROCESS_STALLING=1")
+
+		return cmd
+	}
+}
+
+func TestHelperProcessStalling(t *testing.T) {
+	if os.Getenv("GO_TEST_HELPER_PROCESS_STALLING") != "1" {
+		return
+	}
+
+	// Write enough data to flush through the zstd encoder's internal buffer (~128KB blocks).
+	// Without enough data, zstd buffers everything and the pipe never receives bytes.
+	data := make([]byte, 256*1024)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	_, _ = os.Stdout.Write(data)
+
+	// Stall with stdout open — the compress goroutine blocks on its next read.
+	// The parent process will kill us when the context is cancelled.
+	time.Sleep(time.Hour)
+	os.Exit(0)
+}
+
 func newTestServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()
 

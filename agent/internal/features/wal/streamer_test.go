@@ -2,6 +2,7 @@ package wal
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -285,6 +287,49 @@ func Test_UploadSegment_ServerReturns409_FileNotDeleted(t *testing.T) {
 
 	_, err := os.Stat(filepath.Join(walDir, segmentName))
 	assert.NoError(t, err, "segment file should not be deleted on gap detection")
+}
+
+func Test_UploadSegment_WhenUploadStalls_FailsWithIdleTimeout(t *testing.T) {
+	walDir := createTestWalDir(t)
+
+	// Use incompressible random data to ensure TCP buffers fill up
+	segmentContent := make([]byte, 1024*1024)
+	_, err := rand.Read(segmentContent)
+	require.NoError(t, err)
+
+	writeTestSegment(t, walDir, "000000010000000100000001", segmentContent)
+
+	var requestReceived atomic.Bool
+	handlerDone := make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestReceived.Store(true)
+
+		// Read one byte then stall — simulates a network stall
+		buf := make([]byte, 1)
+		_, _ = r.Body.Read(buf)
+		<-handlerDone
+	}))
+	defer server.Close()
+	defer close(handlerDone)
+
+	origIdleTimeout := uploadIdleTimeout
+	uploadIdleTimeout = 200 * time.Millisecond
+	defer func() { uploadIdleTimeout = origIdleTimeout }()
+
+	streamer := newTestStreamer(walDir, server.URL)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	uploadErr := streamer.uploadSegment(ctx, "000000010000000100000001")
+
+	assert.Error(t, uploadErr, "upload should fail when stalled")
+	assert.True(t, requestReceived.Load(), "server should have received the request")
+	assert.Contains(t, uploadErr.Error(), "idle timeout", "error should mention idle timeout")
+
+	_, statErr := os.Stat(filepath.Join(walDir, "000000010000000100000001"))
+	assert.NoError(t, statErr, "segment file should remain in queue after idle timeout")
 }
 
 func newTestStreamer(walDir, serverURL string) *Streamer {

@@ -18,6 +18,8 @@ import (
 	"databasus-agent/internal/features/api"
 )
 
+var uploadIdleTimeout = 5 * time.Minute
+
 const (
 	pollInterval  = 10 * time.Second
 	uploadTimeout = 5 * time.Minute
@@ -122,16 +124,27 @@ func (s *Streamer) uploadSegment(ctx context.Context, segmentName string) error 
 	filePath := filepath.Join(s.cfg.PgWalDir, segmentName)
 
 	pr, pw := io.Pipe()
+	defer func() { _ = pr.Close() }()
 
 	go s.compressAndStream(pw, filePath)
 
-	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
-	defer cancel()
+	uploadCtx, timeoutCancel := context.WithTimeout(ctx, uploadTimeout)
+	defer timeoutCancel()
+
+	idleCtx, idleCancel := context.WithCancelCause(uploadCtx)
+	defer idleCancel(nil)
+
+	idleReader := api.NewIdleTimeoutReader(pr, uploadIdleTimeout, idleCancel)
+	defer idleReader.Stop()
 
 	s.log.Info("Uploading WAL segment", "segment", segmentName)
 
-	result, err := s.apiClient.UploadWalSegment(uploadCtx, segmentName, pr)
+	result, err := s.apiClient.UploadWalSegment(idleCtx, segmentName, idleReader)
 	if err != nil {
+		if cause := context.Cause(idleCtx); cause != nil {
+			return fmt.Errorf("upload WAL segment: %w", cause)
+		}
+
 		return err
 	}
 
