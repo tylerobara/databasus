@@ -47,7 +47,7 @@ func (r *IdleTimeoutReader) Read(p []byte) (int, error) {
 		r.timer.Reset(r.timeout)
 	}
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		r.Stop()
 	}
 
