@@ -72,71 +72,281 @@ export const AgentInstallationComponent = ({ database, onTokenGenerated }: Props
   );
 
   const downloadCommand = `curl -L -o databasus-agent "${databasusHost}/api/v1/system/agent?arch=${selectedArch}" && chmod +x databasus-agent`;
-
-  const walQueuePath = pgDeploymentType === 'docker' ? '/wal-queue' : '/opt/databasus/wal-queue';
-
-  const postgresqlConfSettings = `wal_level = replica
-archive_mode = on
-archive_command = 'cp %p ${walQueuePath}/%f.tmp && mv ${walQueuePath}/%f.tmp ${walQueuePath}/%f'`;
-
   const pgHbaEntry = `host    replication   all   127.0.0.1/32   md5`;
-
   const grantReplicationSql = `ALTER ROLE <YOUR_PG_USER> WITH REPLICATION;`;
 
-  const createWalDirCommand = `mkdir -p /opt/databasus/wal-queue`;
+  // -- Step 2: Configure postgresql.conf --
 
-  const walDirPermissionsCommand = `chown postgres:postgres /opt/databasus/wal-queue
-chmod 755 /opt/databasus/wal-queue`;
+  const renderStep2System = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 2 — Configure postgresql.conf</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Add or update these settings in your <code>postgresql.conf</code>.
+      </p>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Typical location — Debian/Ubuntu:{' '}
+        <code>/etc/postgresql/&lt;version&gt;/main/postgresql.conf</code>, RHEL/CentOS:{' '}
+        <code>/var/lib/pgsql/&lt;version&gt;/data/postgresql.conf</code>
+      </p>
+      {renderCodeBlock(`wal_level = replica
+archive_mode = on
+archive_command = 'cp %p /opt/databasus/wal-queue/%f.tmp && mv /opt/databasus/wal-queue/%f.tmp /opt/databasus/wal-queue/%f'`)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Restart PostgreSQL to apply the changes:
+      </p>
+      {renderCodeBlock('sudo systemctl restart postgresql')}
+    </div>
+  );
 
-  const dockerWalDirPermissionsCommand = `# Inside the container (or via docker exec):
-chown postgres:postgres /wal-queue`;
+  const renderStep2Folder = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 2 — Configure postgresql.conf</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Add or update these settings in the <code>postgresql.conf</code> inside your PostgreSQL data
+        directory.
+      </p>
+      {renderCodeBlock(`wal_level = replica
+archive_mode = on
+archive_command = 'cp %p /opt/databasus/wal-queue/%f.tmp && mv /opt/databasus/wal-queue/%f.tmp /opt/databasus/wal-queue/%f'`)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Restart PostgreSQL to apply the changes:
+      </p>
+      {renderCodeBlock('pg_ctl -D <YOUR_PG_DATA_DIR> restart')}
+    </div>
+  );
 
-  const dockerVolumeExample = `# In your docker run command:
+  const renderStep2Docker = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 2 — Configure postgresql.conf</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Add or update these settings in your <code>postgresql.conf</code> inside the container. The{' '}
+        <code>/wal-queue</code> path in <code>archive_command</code> is the path{' '}
+        <strong>inside the container</strong> — it must match the volume mount target configured in
+        Step 5.
+      </p>
+      {renderCodeBlock(`wal_level = replica
+archive_mode = on
+archive_command = 'cp %p /wal-queue/%f.tmp && mv /wal-queue/%f.tmp /wal-queue/%f'`)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Restart the container to apply the changes:
+      </p>
+      {renderCodeBlock('docker restart <CONTAINER_NAME>')}
+    </div>
+  );
+
+  // -- Step 3: Configure pg_hba.conf --
+
+  const renderStep3System = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 3 — Configure pg_hba.conf</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Add this line to <code>pg_hba.conf</code> to allow <code>pg_basebackup</code> to take full
+        backups via a local replication connection. Adjust the address and auth method as needed.
+      </p>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Typical location — Debian/Ubuntu:{' '}
+        <code>/etc/postgresql/&lt;version&gt;/main/pg_hba.conf</code>, RHEL/CentOS:{' '}
+        <code>/var/lib/pgsql/&lt;version&gt;/data/pg_hba.conf</code>
+      </p>
+      {renderCodeBlock(pgHbaEntry)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Restart PostgreSQL to apply the changes:
+      </p>
+      {renderCodeBlock('sudo systemctl restart postgresql')}
+    </div>
+  );
+
+  const renderStep3Folder = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 3 — Configure pg_hba.conf</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Add this line to <code>pg_hba.conf</code> in your PostgreSQL data directory to allow{' '}
+        <code>pg_basebackup</code> to take full backups via a local replication connection. Adjust
+        the address and auth method as needed.
+      </p>
+      {renderCodeBlock(pgHbaEntry)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Restart PostgreSQL to apply the changes:
+      </p>
+      {renderCodeBlock('pg_ctl -D <YOUR_PG_DATA_DIR> restart')}
+    </div>
+  );
+
+  const renderStep3Docker = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 3 — Configure pg_hba.conf</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        Add this line to <code>pg_hba.conf</code> inside the container to allow{' '}
+        <code>pg_basebackup</code> to take full backups via a replication connection on the
+        container&apos;s loopback interface. Adjust the address and auth method as needed.
+      </p>
+      {renderCodeBlock(pgHbaEntry)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Restart the container to apply the changes:
+      </p>
+      {renderCodeBlock('docker restart <CONTAINER_NAME>')}
+    </div>
+  );
+
+  // -- Step 5: WAL queue directory --
+
+  const renderStep5System = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 5 — Create WAL queue directory</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        PostgreSQL will place WAL archive files here for the agent to upload.
+      </p>
+      {renderCodeBlock('mkdir -p /opt/databasus/wal-queue')}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Ensure the directory is writable by PostgreSQL and readable by the agent:
+      </p>
+      {renderCodeBlock(`chown postgres:postgres /opt/databasus/wal-queue
+chmod 755 /opt/databasus/wal-queue`)}
+    </div>
+  );
+
+  const renderStep5Folder = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 5 — Create WAL queue directory</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        PostgreSQL will place WAL archive files here for the agent to upload.
+      </p>
+      {renderCodeBlock('mkdir -p /opt/databasus/wal-queue')}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Ensure the directory is writable by PostgreSQL and readable by the agent:
+      </p>
+      {renderCodeBlock(`chown postgres:postgres /opt/databasus/wal-queue
+chmod 755 /opt/databasus/wal-queue`)}
+    </div>
+  );
+
+  const renderStep5Docker = () => (
+    <div>
+      <div className="font-semibold dark:text-white">Step 5 — Set up WAL queue volume</div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        The WAL queue directory must be a <strong>volume mount</strong> shared between the
+        PostgreSQL container and the host. The agent reads WAL files from the host path, while
+        PostgreSQL writes to the container path via <code>archive_command</code>.
+      </p>
+      {renderCodeBlock('mkdir -p /opt/databasus/wal-queue')}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Then mount it as a volume so both the container and the agent can access it:
+      </p>
+      {renderCodeBlock(`# In your docker run command:
 docker run ... -v /opt/databasus/wal-queue:/wal-queue ...
 
 # Or in docker-compose.yml:
 volumes:
-  - /opt/databasus/wal-queue:/wal-queue`;
+  - /opt/databasus/wal-queue:/wal-queue`)}
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Ensure the directory inside the container is owned by the <code>postgres</code> user:
+      </p>
+      {renderCodeBlock(`# Inside the container (or via docker exec):
+chown postgres:postgres /wal-queue`)}
+    </div>
+  );
 
-  const buildStartCommand = () => {
-    const baseFlags = [
-      `  --databasus-host=${databasusHost}`,
-      `  --db-id=${database.id}`,
-      `  --token=<YOUR_AGENT_TOKEN>`,
-      `  --pg-host=localhost`,
-      `  --pg-port=5432`,
-      `  --pg-user=<YOUR_PG_USER>`,
-      `  --pg-password=<YOUR_PG_PASSWORD>`,
-    ];
+  // -- Step 6: Start the agent --
 
-    const baseFlagsWithContinuation = baseFlags.map((f) => f + ' \\');
+  const buildBaseFlags = () => [
+    `  --databasus-host=${databasusHost} \\`,
+    `  --db-id=${database.id} \\`,
+    `  --token=<YOUR_AGENT_TOKEN> \\`,
+    `  --pg-host=localhost \\`,
+    `  --pg-port=5432 \\`,
+    `  --pg-user=<YOUR_PG_USER> \\`,
+    `  --pg-password=<YOUR_PG_PASSWORD> \\`,
+  ];
 
-    if (pgDeploymentType === 'system') {
-      return [
-        './databasus-agent start \\',
-        ...baseFlagsWithContinuation,
-        `  --pg-type=host \\`,
-        `  --pg-wal-dir=/opt/databasus/wal-queue`,
-      ].join('\n');
-    }
-
-    if (pgDeploymentType === 'folder') {
-      return [
-        './databasus-agent start \\',
-        ...baseFlagsWithContinuation,
-        `  --pg-type=host \\`,
-        `  --pg-host-bin-dir=<PATH_TO_PG_BIN_DIR> \\`,
-        `  --pg-wal-dir=/opt/databasus/wal-queue`,
-      ].join('\n');
-    }
-
-    return [
+  const renderStep6System = () => {
+    const startCommand = [
       './databasus-agent start \\',
-      ...baseFlagsWithContinuation,
+      ...buildBaseFlags(),
+      `  --pg-type=host \\`,
+      `  --pg-wal-dir=/opt/databasus/wal-queue`,
+    ].join('\n');
+
+    return (
+      <div>
+        <div className="font-semibold dark:text-white">Step 6 — Start the agent</div>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Replace placeholders in <code>{'<ANGLE_BRACKETS>'}</code> with your actual values.
+        </p>
+        {renderCodeBlock(startCommand)}
+      </div>
+    );
+  };
+
+  const renderStep6Folder = () => {
+    const startCommand = [
+      './databasus-agent start \\',
+      ...buildBaseFlags(),
+      `  --pg-type=host \\`,
+      `  --pg-host-bin-dir=<PATH_TO_PG_BIN_DIR> \\`,
+      `  --pg-wal-dir=/opt/databasus/wal-queue`,
+    ].join('\n');
+
+    return (
+      <div>
+        <div className="font-semibold dark:text-white">Step 6 — Start the agent</div>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Replace placeholders in <code>{'<ANGLE_BRACKETS>'}</code> with your actual values.{' '}
+          <code>--pg-host-bin-dir</code> should point to the directory containing{' '}
+          <code>pg_basebackup</code> (e.g. <code>/usr/lib/postgresql/17/bin</code>).
+        </p>
+        {renderCodeBlock(startCommand)}
+      </div>
+    );
+  };
+
+  const renderStep6Docker = () => {
+    const startCommand = [
+      './databasus-agent start \\',
+      ...buildBaseFlags(),
       `  --pg-type=docker \\`,
       `  --pg-docker-container-name=<CONTAINER_NAME> \\`,
       `  --pg-wal-dir=/opt/databasus/wal-queue`,
     ].join('\n');
+
+    return (
+      <div>
+        <div className="font-semibold dark:text-white">Step 6 — Start the agent</div>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Replace placeholders in <code>{'<ANGLE_BRACKETS>'}</code> with your actual values.
+        </p>
+        <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+          Use the PostgreSQL port <strong>inside the container</strong> (usually 5432), not the
+          host-mapped port.
+        </p>
+        {renderCodeBlock(startCommand)}
+      </div>
+    );
+  };
+
+  // -- Dispatch helpers --
+
+  const renderStep2 = () => {
+    if (pgDeploymentType === 'system') return renderStep2System();
+    if (pgDeploymentType === 'folder') return renderStep2Folder();
+    return renderStep2Docker();
+  };
+
+  const renderStep3 = () => {
+    if (pgDeploymentType === 'system') return renderStep3System();
+    if (pgDeploymentType === 'folder') return renderStep3Folder();
+    return renderStep3Docker();
+  };
+
+  const renderStep5 = () => {
+    if (pgDeploymentType === 'system') return renderStep5System();
+    if (pgDeploymentType === 'folder') return renderStep5Folder();
+    return renderStep5Docker();
+  };
+
+  const renderStep6 = () => {
+    if (pgDeploymentType === 'system') return renderStep6System();
+    if (pgDeploymentType === 'folder') return renderStep6Folder();
+    return renderStep6Docker();
   };
 
   return (
@@ -247,31 +457,8 @@ volumes:
           {renderCodeBlock(downloadCommand)}
         </div>
 
-        <div>
-          <div className="font-semibold dark:text-white">Step 2 — Configure postgresql.conf</div>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Add or update these settings in your <code>postgresql.conf</code>, then{' '}
-            <strong>restart PostgreSQL</strong>.
-          </p>
-          {pgDeploymentType === 'docker' && (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              The <code>archive_command</code> path (<code>/wal-queue</code>) is the path{' '}
-              <strong>inside the container</strong>. It must match the volume mount target — see
-              Step 5.
-            </p>
-          )}
-          {renderCodeBlock(postgresqlConfSettings)}
-        </div>
-
-        <div>
-          <div className="font-semibold dark:text-white">Step 3 — Configure pg_hba.conf</div>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Add this line to <code>pg_hba.conf</code>. This is required for{' '}
-            <code>pg_basebackup</code> to take full backups — not for streaming replication. Adjust
-            the address and auth method as needed, then reload PostgreSQL.
-          </p>
-          {renderCodeBlock(pgHbaEntry)}
-        </div>
+        {renderStep2()}
+        {renderStep3()}
 
         <div>
           <div className="font-semibold dark:text-white">Step 4 — Grant replication privilege</div>
@@ -282,58 +469,8 @@ volumes:
           {renderCodeBlock(grantReplicationSql)}
         </div>
 
-        <div>
-          <div className="font-semibold dark:text-white">
-            Step 5 —{' '}
-            {pgDeploymentType === 'docker'
-              ? 'Set up WAL queue volume'
-              : 'Create WAL queue directory'}
-          </div>
-          {pgDeploymentType === 'docker' ? (
-            <>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                The WAL queue directory must be a <strong>volume mount</strong> shared between the
-                PostgreSQL container and the host. The agent reads WAL files from the host path,
-                while PostgreSQL writes to the container path via <code>archive_command</code>.
-              </p>
-              {renderCodeBlock(createWalDirCommand)}
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Then mount it as a volume so both the container and the agent can access it:
-              </p>
-              {renderCodeBlock(dockerVolumeExample)}
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Ensure the directory inside the container is owned by the <code>postgres</code>{' '}
-                user:
-              </p>
-              {renderCodeBlock(dockerWalDirPermissionsCommand)}
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                PostgreSQL will place WAL archive files here for the agent to upload.
-              </p>
-              {renderCodeBlock(createWalDirCommand)}
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Ensure the directory is writable by PostgreSQL and readable by the agent:
-              </p>
-              {renderCodeBlock(walDirPermissionsCommand)}
-            </>
-          )}
-        </div>
-
-        <div>
-          <div className="font-semibold dark:text-white">Step 6 — Start the agent</div>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Replace placeholders in <code>{'<ANGLE_BRACKETS>'}</code> with your actual values.
-          </p>
-          {pgDeploymentType === 'docker' && (
-            <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
-              Use the PostgreSQL port <strong>inside the container</strong> (usually 5432), not the
-              host-mapped port.
-            </p>
-          )}
-          {renderCodeBlock(buildStartCommand())}
-        </div>
+        {renderStep5()}
+        {renderStep6()}
 
         <div>
           <div className="font-semibold dark:text-white">After installation</div>
