@@ -40,12 +40,15 @@ func (c *BackupController) RegisterPublicRoutes(router *gin.RouterGroup) {
 
 // GetBackups
 // @Summary Get backups for a database
-// @Description Get paginated backups for the specified database
+// @Description Get paginated backups for the specified database with optional filters
 // @Tags backups
 // @Produce json
 // @Param database_id query string true "Database ID"
 // @Param limit query int false "Number of items per page" default(10)
 // @Param offset query int false "Offset for pagination" default(0)
+// @Param status query []string false "Filter by backup status (can be repeated)" Enums(IN_PROGRESS, COMPLETED, FAILED, CANCELED)
+// @Param beforeDate query string false "Filter backups created before this date (RFC3339)" format(date-time)
+// @Param pgWalBackupType query string false "Filter by WAL backup type" Enums(PG_FULL_BACKUP, PG_WAL_SEGMENT)
 // @Success 200 {object} backups_dto.GetBackupsResponse
 // @Failure 400
 // @Failure 401
@@ -70,7 +73,9 @@ func (c *BackupController) GetBackups(ctx *gin.Context) {
 		return
 	}
 
-	response, err := c.backupService.GetBackups(user, databaseID, request.Limit, request.Offset)
+	filters := c.buildBackupFilters(&request)
+
+	response, err := c.backupService.GetBackups(user, databaseID, request.Limit, request.Offset, filters)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -358,4 +363,36 @@ func (c *BackupController) startDownloadHeartbeat(ctx context.Context, userID uu
 			c.backupService.RefreshDownloadLock(userID)
 		}
 	}
+}
+
+func (c *BackupController) buildBackupFilters(
+	request *backups_dto.GetBackupsRequest,
+) *backups_core.BackupFilters {
+	isHasFilters := len(request.Statuses) > 0 ||
+		request.BeforeDate != nil ||
+		request.PgWalBackupType != nil
+
+	if !isHasFilters {
+		return nil
+	}
+
+	filters := &backups_core.BackupFilters{}
+
+	if len(request.Statuses) > 0 {
+		statuses := make([]backups_core.BackupStatus, 0, len(request.Statuses))
+		for _, statusStr := range request.Statuses {
+			statuses = append(statuses, backups_core.BackupStatus(statusStr))
+		}
+
+		filters.Statuses = statuses
+	}
+
+	filters.BeforeDate = request.BeforeDate
+
+	if request.PgWalBackupType != nil {
+		walType := backups_core.PgWalBackupType(*request.PgWalBackupType)
+		filters.PgWalBackupType = &walType
+	}
+
+	return filters
 }

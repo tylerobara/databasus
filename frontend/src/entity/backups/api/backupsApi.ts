@@ -3,11 +3,29 @@ import RequestOptions from '../../../shared/api/RequestOptions';
 import { apiHelper } from '../../../shared/api/apiHelper';
 import type { GetBackupsResponse } from '../model/GetBackupsResponse';
 
+export interface BackupsFilters {
+  statuses?: string[];
+  beforeDate?: string;
+  pgWalBackupType?: string;
+}
+
 export const backupsApi = {
-  async getBackups(databaseId: string, limit?: number, offset?: number) {
+  async getBackups(databaseId: string, limit?: number, offset?: number, filters?: BackupsFilters) {
     const params = new URLSearchParams({ database_id: databaseId });
     if (limit !== undefined) params.append('limit', limit.toString());
     if (offset !== undefined) params.append('offset', offset.toString());
+
+    if (filters?.statuses) {
+      for (const status of filters.statuses) {
+        params.append('status', status);
+      }
+    }
+    if (filters?.beforeDate) {
+      params.append('beforeDate', filters.beforeDate);
+    }
+    if (filters?.pgWalBackupType) {
+      params.append('pgWalBackupType', filters.pgWalBackupType);
+    }
 
     return apiHelper.fetchGetJson<GetBackupsResponse>(
       `${getApplicationServer()}/api/v1/backups?${params.toString()}`,

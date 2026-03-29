@@ -140,6 +140,225 @@ func Test_GetBackups_PermissionsEnforced(t *testing.T) {
 	}
 }
 
+func Test_GetBackups_WithStatusFilter_ReturnsFilteredBackups(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+
+	database := createTestDatabase("Test Database", workspace.ID, owner.Token, router)
+	storage := createTestStorage(workspace.ID)
+
+	defer func() {
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	now := time.Now().UTC()
+
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusCompleted,
+		CreatedAt: now.Add(-3 * time.Hour),
+	})
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusFailed,
+		CreatedAt: now.Add(-2 * time.Hour),
+	})
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusCanceled,
+		CreatedAt: now.Add(-1 * time.Hour),
+	})
+
+	// Single status filter
+	var singleResponse backups_dto.GetBackupsResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t,
+		router,
+		fmt.Sprintf("/api/v1/backups?database_id=%s&status=COMPLETED", database.ID.String()),
+		"Bearer "+owner.Token,
+		http.StatusOK,
+		&singleResponse,
+	)
+
+	assert.Equal(t, int64(1), singleResponse.Total)
+	assert.Len(t, singleResponse.Backups, 1)
+	assert.Equal(t, backups_core.BackupStatusCompleted, singleResponse.Backups[0].Status)
+
+	// Multiple status filter
+	var multiResponse backups_dto.GetBackupsResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t,
+		router,
+		fmt.Sprintf(
+			"/api/v1/backups?database_id=%s&status=COMPLETED&status=FAILED",
+			database.ID.String(),
+		),
+		"Bearer "+owner.Token,
+		http.StatusOK,
+		&multiResponse,
+	)
+
+	assert.Equal(t, int64(2), multiResponse.Total)
+	assert.Len(t, multiResponse.Backups, 2)
+
+	for _, backup := range multiResponse.Backups {
+		assert.True(
+			t,
+			backup.Status == backups_core.BackupStatusCompleted ||
+				backup.Status == backups_core.BackupStatusFailed,
+			"expected COMPLETED or FAILED, got %s", backup.Status,
+		)
+	}
+}
+
+func Test_GetBackups_WithBeforeDateFilter_ReturnsFilteredBackups(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+
+	database := createTestDatabase("Test Database", workspace.ID, owner.Token, router)
+	storage := createTestStorage(workspace.ID)
+
+	defer func() {
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	now := time.Now().UTC()
+	cutoff := now.Add(-1 * time.Hour)
+
+	olderBackup := CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusCompleted,
+		CreatedAt: now.Add(-3 * time.Hour),
+	})
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusCompleted,
+		CreatedAt: now,
+	})
+
+	var response backups_dto.GetBackupsResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t,
+		router,
+		fmt.Sprintf(
+			"/api/v1/backups?database_id=%s&beforeDate=%s",
+			database.ID.String(),
+			cutoff.Format(time.RFC3339),
+		),
+		"Bearer "+owner.Token,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.Equal(t, int64(1), response.Total)
+	assert.Len(t, response.Backups, 1)
+	assert.Equal(t, olderBackup.ID, response.Backups[0].ID)
+}
+
+func Test_GetBackups_WithPgWalBackupTypeFilter_ReturnsFilteredBackups(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+
+	database := createTestDatabase("Test Database", workspace.ID, owner.Token, router)
+	storage := createTestStorage(workspace.ID)
+
+	defer func() {
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	now := time.Now().UTC()
+	fullBackupType := backups_core.PgWalBackupTypeFullBackup
+	walSegmentType := backups_core.PgWalBackupTypeWalSegment
+
+	fullBackup := CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:          backups_core.BackupStatusCompleted,
+		CreatedAt:       now.Add(-2 * time.Hour),
+		PgWalBackupType: &fullBackupType,
+	})
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:          backups_core.BackupStatusCompleted,
+		CreatedAt:       now.Add(-1 * time.Hour),
+		PgWalBackupType: &walSegmentType,
+	})
+
+	var response backups_dto.GetBackupsResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t,
+		router,
+		fmt.Sprintf(
+			"/api/v1/backups?database_id=%s&pgWalBackupType=PG_FULL_BACKUP",
+			database.ID.String(),
+		),
+		"Bearer "+owner.Token,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.Equal(t, int64(1), response.Total)
+	assert.Len(t, response.Backups, 1)
+	assert.Equal(t, fullBackup.ID, response.Backups[0].ID)
+}
+
+func Test_GetBackups_WithCombinedFilters_ReturnsFilteredBackups(t *testing.T) {
+	router := createTestRouter()
+	owner := users_testing.CreateTestUser(users_enums.UserRoleMember)
+	workspace := workspaces_testing.CreateTestWorkspace("Test Workspace", owner, router)
+
+	database := createTestDatabase("Test Database", workspace.ID, owner.Token, router)
+	storage := createTestStorage(workspace.ID)
+
+	defer func() {
+		databases.RemoveTestDatabase(database)
+		time.Sleep(50 * time.Millisecond)
+		storages.RemoveTestStorage(storage.ID)
+		workspaces_testing.RemoveTestWorkspace(workspace, router)
+	}()
+
+	now := time.Now().UTC()
+	cutoff := now.Add(-1 * time.Hour)
+
+	// Old completed — should match
+	oldCompleted := CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusCompleted,
+		CreatedAt: now.Add(-3 * time.Hour),
+	})
+	// Old failed — should NOT match (wrong status)
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusFailed,
+		CreatedAt: now.Add(-2 * time.Hour),
+	})
+	// New completed — should NOT match (too recent)
+	CreateTestBackupWithOptions(database.ID, storage.ID, TestBackupOptions{
+		Status:    backups_core.BackupStatusCompleted,
+		CreatedAt: now,
+	})
+
+	var response backups_dto.GetBackupsResponse
+	test_utils.MakeGetRequestAndUnmarshal(
+		t,
+		router,
+		fmt.Sprintf(
+			"/api/v1/backups?database_id=%s&status=COMPLETED&beforeDate=%s",
+			database.ID.String(),
+			cutoff.Format(time.RFC3339),
+		),
+		"Bearer "+owner.Token,
+		http.StatusOK,
+		&response,
+	)
+
+	assert.Equal(t, int64(1), response.Total)
+	assert.Len(t, response.Backups, 1)
+	assert.Equal(t, oldCompleted.ID, response.Backups[0].ID)
+}
+
 func Test_CreateBackup_PermissionsEnforced(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -376,7 +595,7 @@ func Test_DeleteBackup_PermissionsEnforced(t *testing.T) {
 				ownerUser, err := userService.GetUserFromToken(owner.Token)
 				assert.NoError(t, err)
 
-				response, err := backups_services.GetBackupService().GetBackups(ownerUser, database.ID, 10, 0)
+				response, err := backups_services.GetBackupService().GetBackups(ownerUser, database.ID, 10, 0, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, 0, len(response.Backups))
 			}

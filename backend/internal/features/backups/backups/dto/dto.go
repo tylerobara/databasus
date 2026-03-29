@@ -11,9 +11,12 @@ import (
 )
 
 type GetBackupsRequest struct {
-	DatabaseID string `form:"database_id" binding:"required"`
-	Limit      int    `form:"limit"`
-	Offset     int    `form:"offset"`
+	DatabaseID      string     `form:"database_id"     binding:"required"`
+	Limit           int        `form:"limit"`
+	Offset          int        `form:"offset"`
+	Statuses        []string   `form:"status"`
+	BeforeDate      *time.Time `form:"beforeDate"`
+	PgWalBackupType *string    `form:"pgWalBackupType"`
 }
 
 type GetBackupsResponse struct {

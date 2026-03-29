@@ -23,7 +23,7 @@ func (c *VersionController) RegisterRoutes(router *gin.RouterGroup) {
 func (c *VersionController) GetVersion(ctx *gin.Context) {
 	version := os.Getenv("APP_VERSION")
 	if version == "" {
-		version = "dev"
+		version = "3.26.0"
 	}
 
 	ctx.JSON(http.StatusOK, VersionResponse{Version: version})

@@ -109,6 +109,7 @@ func (s *BackupService) GetBackups(
 	user *users_models.User,
 	databaseID uuid.UUID,
 	limit, offset int,
+	filters *backups_core.BackupFilters,
 ) (*backups_dto.GetBackupsResponse, error) {
 	database, err := s.databaseService.GetDatabaseByID(databaseID)
 	if err != nil {
@@ -134,12 +135,14 @@ func (s *BackupService) GetBackups(
 		offset = 0
 	}
 
-	backups, err := s.backupRepository.FindByDatabaseIDWithPagination(databaseID, limit, offset)
+	backups, err := s.backupRepository.FindByDatabaseIDWithFiltersAndPagination(
+		databaseID, filters, limit, offset,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	total, err := s.backupRepository.CountByDatabaseID(databaseID)
+	total, err := s.backupRepository.CountByDatabaseIDWithFilters(databaseID, filters)
 	if err != nil {
 		return nil, err
 	}

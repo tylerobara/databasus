@@ -422,3 +422,67 @@ func (r *BackupRepository) FindLastWalSegmentAfter(
 
 	return &backup, nil
 }
+
+func (r *BackupRepository) FindByDatabaseIDWithFiltersAndPagination(
+	databaseID uuid.UUID,
+	filters *BackupFilters,
+	limit, offset int,
+) ([]*Backup, error) {
+	var backups []*Backup
+
+	query := storage.
+		GetDb().
+		Where("database_id = ?", databaseID)
+
+	if filters != nil {
+		query = filters.applyToQuery(query)
+	}
+
+	if err := query.
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&backups).Error; err != nil {
+		return nil, err
+	}
+
+	return backups, nil
+}
+
+func (r *BackupRepository) CountByDatabaseIDWithFilters(
+	databaseID uuid.UUID,
+	filters *BackupFilters,
+) (int64, error) {
+	var count int64
+
+	query := storage.
+		GetDb().
+		Model(&Backup{}).
+		Where("database_id = ?", databaseID)
+
+	if filters != nil {
+		query = filters.applyToQuery(query)
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (f *BackupFilters) applyToQuery(query *gorm.DB) *gorm.DB {
+	if len(f.Statuses) > 0 {
+		query = query.Where("status IN ?", f.Statuses)
+	}
+
+	if f.BeforeDate != nil {
+		query = query.Where("created_at < ?", *f.BeforeDate)
+	}
+
+	if f.PgWalBackupType != nil {
+		query = query.Where("pg_wal_backup_type = ?", *f.PgWalBackupType)
+	}
+
+	return query
+}

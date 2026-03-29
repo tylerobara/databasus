@@ -5,6 +5,8 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   ExclamationCircleOutlined,
+  FilterFilled,
+  FilterOutlined,
   InfoCircleOutlined,
   LockOutlined,
   SyncOutlined,
@@ -24,12 +26,14 @@ import {
   backupConfigApi,
   backupsApi,
 } from '../../../entity/backups';
+import type { BackupsFilters } from '../../../entity/backups/api/backupsApi';
 import { type Database, DatabaseType, PostgresBackupType } from '../../../entity/databases';
 import { getUserTimeFormat } from '../../../shared/time';
 import { ConfirmationComponent } from '../../../shared/ui';
 import { RestoresComponent } from '../../restores';
 import { AgentRestoreComponent } from './AgentRestoreComponent';
 import { BackupsBillingBannerComponent } from './BackupsBillingBannerComponent';
+import { BackupsFiltersPanelComponent } from './BackupsFiltersPanelComponent';
 
 const BACKUPS_PAGE_SIZE = 50;
 
@@ -74,6 +78,9 @@ export const BackupsComponent = ({
   const [downloadingBackupId, setDownloadingBackupId] = useState<string | undefined>();
   const [cancellingBackupId, setCancellingBackupId] = useState<string | undefined>();
 
+  const [isFilterPanelVisible, setIsFilterPanelVisible] = useState(false);
+  const [filters, setFilters] = useState<BackupsFilters>({});
+
   const downloadBackup = async (backupId: string) => {
     try {
       await backupsApi.downloadBackup(backupId);
@@ -84,7 +91,7 @@ export const BackupsComponent = ({
     }
   };
 
-  const loadBackups = async (limit?: number) => {
+  const loadBackups = async (limit?: number, filtersOverride?: BackupsFilters) => {
     if (isBackupsRequestInFlightRef.current) return;
     isBackupsRequestInFlightRef.current = true;
 
@@ -92,9 +99,10 @@ export const BackupsComponent = ({
     lastRequestTimeRef.current = requestTime;
 
     const loadLimit = limit ?? currentLimit;
+    const activeFilters = filtersOverride ?? filters;
 
     try {
-      const response = await backupsApi.getBackups(database.id, loadLimit, 0);
+      const response = await backupsApi.getBackups(database.id, loadLimit, 0, activeFilters);
 
       if (lastRequestTimeRef.current !== requestTime) return;
 
@@ -124,7 +132,7 @@ export const BackupsComponent = ({
     lastRequestTimeRef.current = requestTime;
 
     try {
-      const response = await backupsApi.getBackups(database.id, newLimit, 0);
+      const response = await backupsApi.getBackups(database.id, newLimit, 0, filters);
 
       if (lastRequestTimeRef.current !== requestTime) return;
 
@@ -207,12 +215,19 @@ export const BackupsComponent = ({
   }, [database]);
 
   useEffect(() => {
+    setCurrentLimit(BACKUPS_PAGE_SIZE);
+    setHasMore(true);
+    setIsBackupsLoading(true);
+    loadBackups(BACKUPS_PAGE_SIZE, filters).then(() => setIsBackupsLoading(false));
+  }, [filters]);
+
+  useEffect(() => {
     const intervalId = setInterval(() => {
       loadBackups();
     }, 1_000);
 
     return () => clearInterval(intervalId);
-  }, [currentLimit]);
+  }, [currentLimit, filters]);
 
   useEffect(() => {
     if (downloadingBackupId) {
@@ -432,29 +447,6 @@ export const BackupsComponent = ({
       dataIndex: 'status',
       key: 'status',
       render: (status: BackupStatus, record: Backup) => renderStatus(status, record),
-      filters: [
-        {
-          value: BackupStatus.IN_PROGRESS,
-          text: 'In progress',
-        },
-        {
-          value: BackupStatus.FAILED,
-          text: 'Failed',
-        },
-        {
-          value: BackupStatus.COMPLETED,
-          text: 'Successful',
-        },
-        {
-          value: BackupStatus.DELETED,
-          text: 'Deleted',
-        },
-        {
-          value: BackupStatus.CANCELED,
-          text: 'Canceled',
-        },
-      ],
-      onFilter: (value, record) => record.status === value,
     },
     {
       title: (
@@ -502,6 +494,11 @@ export const BackupsComponent = ({
     },
   ];
 
+  const isAnyFilterApplied =
+    (filters.statuses && filters.statuses.length > 0) ||
+    filters.beforeDate !== undefined ||
+    filters.pgWalBackupType !== undefined;
+
   if (isBackupConfigLoading) {
     return (
       <div className="mb-5 flex items-center">
@@ -514,7 +511,35 @@ export const BackupsComponent = ({
     <div
       className={`w-full bg-white p-3 shadow md:p-5 dark:bg-gray-800 ${isDirectlyUnderTab ? 'rounded-tr-md rounded-br-md rounded-bl-md' : 'rounded-md'}`}
     >
-      <h2 className="text-lg font-bold md:text-xl dark:text-white">Backups</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-bold md:text-xl dark:text-white">Backups</h2>
+        <div className="relative">
+          {isFilterPanelVisible ? (
+            <FilterFilled
+              className="cursor-pointer text-blue-600"
+              onClick={() => setIsFilterPanelVisible(false)}
+            />
+          ) : (
+            <FilterOutlined
+              className="cursor-pointer"
+              onClick={() => setIsFilterPanelVisible(true)}
+            />
+          )}
+          {!isFilterPanelVisible && isAnyFilterApplied && (
+            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-blue-600" />
+          )}
+        </div>
+      </div>
+
+      {isFilterPanelVisible && (
+        <div className="mt-3">
+          <BackupsFiltersPanelComponent
+            filters={filters}
+            onFiltersChange={setFilters}
+            isWalDatabase={database.postgresql?.backupType === PostgresBackupType.WAL_V1}
+          />
+        </div>
+      )}
 
       {IS_CLOUD && (
         <BackupsBillingBannerComponent
