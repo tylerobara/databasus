@@ -239,7 +239,8 @@ RUN apt-get update && \
   fi
 
 # Create postgres user and set up directories
-RUN useradd -m -s /bin/bash postgres || true && \
+RUN groupadd -g 999 postgres || true && \
+  useradd -m -s /bin/bash -u 999 -g 999 postgres || true && \
   mkdir -p /databasus-data/pgdata && \
   chown -R postgres:postgres /databasus-data/pgdata
 
@@ -292,6 +293,23 @@ if [ -d "/postgresus-data" ] && [ "\$(ls -A /postgresus-data 2>/dev/null)" ]; th
     echo ""
     echo "=========================================="
     exit 1
+fi
+
+# ========= Adjust postgres user UID/GID =========
+PUID=\${PUID:-999}
+PGID=\${PGID:-999}
+
+CURRENT_UID=\$(id -u postgres)
+CURRENT_GID=\$(id -g postgres)
+
+if [ "\$CURRENT_GID" != "\$PGID" ]; then
+    echo "Adjusting postgres group GID from \$CURRENT_GID to \$PGID..."
+    groupmod -o -g "\$PGID" postgres
+fi
+
+if [ "\$CURRENT_UID" != "\$PUID" ]; then
+    echo "Adjusting postgres user UID from \$CURRENT_UID to \$PUID..."
+    usermod -o -u "\$PUID" postgres
 fi
 
 # PostgreSQL 17 binary paths
