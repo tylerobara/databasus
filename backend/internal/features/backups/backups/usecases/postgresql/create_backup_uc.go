@@ -747,15 +747,9 @@ func (uc *CreatePostgresqlBackupUsecase) createTempPgpassFile(
 		escapedPassword,
 	)
 
-	tempFolder := config.GetEnv().TempFolder
-	if err := os.MkdirAll(tempFolder, 0o700); err != nil {
-		return "", fmt.Errorf("failed to ensure temp folder exists: %w", err)
-	}
-	if err := os.Chmod(tempFolder, 0o700); err != nil {
-		return "", fmt.Errorf("failed to set temp folder permissions: %w", err)
-	}
-
-	tempDir, err := os.MkdirTemp(tempFolder, "pgpass_"+uuid.New().String())
+	// Credential files use OS temp dir (/tmp) because some filesystems
+	// (e.g. ZFS on TrueNAS) ignore chmod, causing "group or world access" errors.
+	tempDir, err := os.MkdirTemp(os.TempDir(), "pgpass_"+uuid.New().String())
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary directory: %w", err)
 	}

@@ -287,15 +287,9 @@ func (uc *RestoreMariadbBackupUsecase) createTempMyCnfFile(
 	mdbConfig *mariadbtypes.MariadbDatabase,
 	password string,
 ) (string, error) {
-	tempFolder := config.GetEnv().TempFolder
-	if err := os.MkdirAll(tempFolder, 0o700); err != nil {
-		return "", fmt.Errorf("failed to ensure temp folder exists: %w", err)
-	}
-	if err := os.Chmod(tempFolder, 0o700); err != nil {
-		return "", fmt.Errorf("failed to set temp folder permissions: %w", err)
-	}
-
-	tempDir, err := os.MkdirTemp(tempFolder, "mycnf_"+uuid.New().String())
+	// Credential files use OS temp dir (/tmp) because some filesystems
+	// (e.g. ZFS on TrueNAS) ignore chmod, causing "group or world access" errors.
+	tempDir, err := os.MkdirTemp(os.TempDir(), "mycnf_"+uuid.New().String())
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
