@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import { IS_CLOUD } from '../../../../constants';
 import { type Database, databaseApi } from '../../../../entity/databases';
 import { MongodbConnectionStringParser } from '../../../../entity/databases/model/mongodb/MongodbConnectionStringParser';
+import { ClipboardHelper } from '../../../../shared/lib/ClipboardHelper';
 import { ToastHelper } from '../../../../shared/toast';
+import { ClipboardPasteModalComponent } from '../../../../shared/ui';
 
 interface Props {
   database: Database;
@@ -52,56 +54,65 @@ export const EditMongoDbSpecificDataComponent = ({
     !!database.mongodb?.isDirectConnection;
   const [isShowAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
 
+  const [isShowPasteModal, setIsShowPasteModal] = useState(false);
+
+  const applyConnectionString = (text: string) => {
+    const trimmedText = text.trim();
+
+    if (!trimmedText) {
+      message.error('Clipboard is empty');
+      return;
+    }
+
+    const result = MongodbConnectionStringParser.parse(trimmedText);
+
+    if ('error' in result) {
+      message.error(result.error);
+      return;
+    }
+
+    if (!editingDatabase?.mongodb) return;
+
+    const updatedDatabase: Database = {
+      ...editingDatabase,
+      mongodb: {
+        ...editingDatabase.mongodb,
+        host: result.host,
+        port: result.port,
+        username: result.username,
+        password: result.password || '',
+        database: result.database,
+        authDatabase: result.authDatabase,
+        isHttps: result.useTls,
+        isSrv: result.isSrv,
+        isDirectConnection: result.isDirectConnection,
+        cpuCount: 1,
+      },
+    };
+
+    if (result.isSrv || result.isDirectConnection) {
+      setShowAdvanced(true);
+    }
+
+    setEditingDatabase(updatedDatabase);
+    setIsConnectionTested(false);
+
+    if (!result.password) {
+      message.warning('Connection string parsed successfully. Please enter the password manually.');
+    } else {
+      message.success('Connection string parsed successfully');
+    }
+  };
+
   const parseFromClipboard = async () => {
+    if (!ClipboardHelper.isClipboardApiAvailable()) {
+      setIsShowPasteModal(true);
+      return;
+    }
+
     try {
-      const text = await navigator.clipboard.readText();
-      const trimmedText = text.trim();
-
-      if (!trimmedText) {
-        message.error('Clipboard is empty');
-        return;
-      }
-
-      const result = MongodbConnectionStringParser.parse(trimmedText);
-
-      if ('error' in result) {
-        message.error(result.error);
-        return;
-      }
-
-      if (!editingDatabase?.mongodb) return;
-
-      const updatedDatabase: Database = {
-        ...editingDatabase,
-        mongodb: {
-          ...editingDatabase.mongodb,
-          host: result.host,
-          port: result.port,
-          username: result.username,
-          password: result.password || '',
-          database: result.database,
-          authDatabase: result.authDatabase,
-          isHttps: result.useTls,
-          isSrv: result.isSrv,
-          isDirectConnection: result.isDirectConnection,
-          cpuCount: 1,
-        },
-      };
-
-      if (result.isSrv || result.isDirectConnection) {
-        setShowAdvanced(true);
-      }
-
-      setEditingDatabase(updatedDatabase);
-      setIsConnectionTested(false);
-
-      if (!result.password) {
-        message.warning(
-          'Connection string parsed successfully. Please enter the password manually.',
-        );
-      } else {
-        message.success('Connection string parsed successfully');
-      }
+      const text = await ClipboardHelper.readFromClipboard();
+      applyConnectionString(text);
     } catch {
       message.error('Failed to read clipboard. Please check browser permissions.');
     }
@@ -501,6 +512,15 @@ export const EditMongoDbSpecificDataComponent = ({
           list.
         </div>
       )}
+
+      <ClipboardPasteModalComponent
+        open={isShowPasteModal}
+        onSubmit={(text) => {
+          setIsShowPasteModal(false);
+          applyConnectionString(text);
+        }}
+        onCancel={() => setIsShowPasteModal(false)}
+      />
     </div>
   );
 };

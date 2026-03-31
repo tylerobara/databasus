@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Backup } from '../../../entity/backups';
 import { type Database, DatabaseType } from '../../../entity/databases';
 import { type Restore, RestoreStatus, restoreApi } from '../../../entity/restores';
+import { ClipboardHelper } from '../../../shared/lib/ClipboardHelper';
 import { getUserTimeFormat } from '../../../shared/time';
 import { ConfirmationComponent } from '../../../shared/ui';
 import { EditDatabaseSpecificDataComponent } from '../../databases/ui/edit/EditDatabaseSpecificDataComponent';
@@ -328,7 +329,7 @@ export const RestoresComponent = ({ database, backup }: Props) => {
             <Button
               icon={<CopyOutlined />}
               onClick={() => {
-                navigator.clipboard.writeText(showingRestoreError.failMessage || '');
+                ClipboardHelper.copyToClipboard(showingRestoreError.failMessage || '');
                 message.success('Error message copied to clipboard');
               }}
             >

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { getApplicationServer } from '../../../constants';
 import { type Database, databaseApi } from '../../../entity/databases';
+import { ClipboardHelper } from '../../../shared/lib/ClipboardHelper';
 
 type Architecture = 'amd64' | 'arm64';
 type PgDeploymentType = 'system' | 'folder' | 'docker';
@@ -42,7 +43,7 @@ export const AgentInstallationComponent = ({ database, onTokenGenerated }: Props
 
   const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await ClipboardHelper.copyToClipboard(text);
       message.success('Copied to clipboard');
     } catch {
       message.error('Failed to copy');

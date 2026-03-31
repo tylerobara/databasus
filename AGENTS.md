@@ -1566,6 +1566,13 @@ export const ReactComponent = ({ someValue }: Props): JSX.Element => {
    - **Calculated values** - Derived data from props/state
    - **Return** - JSX markup
 
+### Clipboard operations
+
+Always use `ClipboardHelper` (`shared/lib/ClipboardHelper.ts`) for clipboard operations — never call `navigator.clipboard` directly.
+
+- **Copy:** `ClipboardHelper.copyToClipboard(text)` — uses `navigator.clipboard` with `execCommand('copy')` fallback for non-secure contexts (HTTP).
+- **Paste:** Check `ClipboardHelper.isClipboardApiAvailable()` first. If available, use `ClipboardHelper.readFromClipboard()`. If not, show `ClipboardPasteModalComponent` (`shared/ui`) which lets the user paste manually via a text input modal.
+
 ---
 
 ## Summary

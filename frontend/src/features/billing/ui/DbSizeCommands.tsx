@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { ClipboardHelper } from '../../../shared/lib/ClipboardHelper';
+
 interface DbSizeCommand {
   label: string;
   code: string;
@@ -44,7 +46,7 @@ export function DbSizeCommands({ commands }: Props) {
               <button
                 onClick={async () => {
                   try {
-                    await navigator.clipboard.writeText(cmd.code);
+                    await ClipboardHelper.copyToClipboard(cmd.code);
                     setCopiedIndex(index);
                     setTimeout(() => setCopiedIndex(null), 2000);
                   } catch {

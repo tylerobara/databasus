@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import { IS_CLOUD } from '../../../../constants';
 import { type Database, databaseApi } from '../../../../entity/databases';
 import { MariadbConnectionStringParser } from '../../../../entity/databases/model/mariadb/MariadbConnectionStringParser';
+import { ClipboardHelper } from '../../../../shared/lib/ClipboardHelper';
 import { ToastHelper } from '../../../../shared/toast';
+import { ClipboardPasteModalComponent } from '../../../../shared/ui';
 
 interface Props {
   database: Database;
@@ -49,41 +51,52 @@ export const EditMariaDbSpecificDataComponent = ({
   const hasAdvancedValues = !!database.mariadb?.isExcludeEvents;
   const [isShowAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
 
+  const [isShowPasteModal, setIsShowPasteModal] = useState(false);
+
+  const applyConnectionString = (text: string) => {
+    const trimmedText = text.trim();
+
+    if (!trimmedText) {
+      message.error('Clipboard is empty');
+      return;
+    }
+
+    const result = MariadbConnectionStringParser.parse(trimmedText);
+
+    if ('error' in result) {
+      message.error(result.error);
+      return;
+    }
+
+    if (!editingDatabase?.mariadb) return;
+
+    const updatedDatabase: Database = {
+      ...editingDatabase,
+      mariadb: {
+        ...editingDatabase.mariadb,
+        host: result.host,
+        port: result.port,
+        username: result.username,
+        password: result.password,
+        database: result.database,
+        isHttps: result.isHttps,
+      },
+    };
+
+    setEditingDatabase(updatedDatabase);
+    setIsConnectionTested(false);
+    message.success('Connection string parsed successfully');
+  };
+
   const parseFromClipboard = async () => {
+    if (!ClipboardHelper.isClipboardApiAvailable()) {
+      setIsShowPasteModal(true);
+      return;
+    }
+
     try {
-      const text = await navigator.clipboard.readText();
-      const trimmedText = text.trim();
-
-      if (!trimmedText) {
-        message.error('Clipboard is empty');
-        return;
-      }
-
-      const result = MariadbConnectionStringParser.parse(trimmedText);
-
-      if ('error' in result) {
-        message.error(result.error);
-        return;
-      }
-
-      if (!editingDatabase?.mariadb) return;
-
-      const updatedDatabase: Database = {
-        ...editingDatabase,
-        mariadb: {
-          ...editingDatabase.mariadb,
-          host: result.host,
-          port: result.port,
-          username: result.username,
-          password: result.password,
-          database: result.database,
-          isHttps: result.isHttps,
-        },
-      };
-
-      setEditingDatabase(updatedDatabase);
-      setIsConnectionTested(false);
-      message.success('Connection string parsed successfully');
+      const text = await ClipboardHelper.readFromClipboard();
+      applyConnectionString(text);
     } catch {
       message.error('Failed to read clipboard. Please check browser permissions.');
     }
@@ -408,6 +421,15 @@ export const EditMariaDbSpecificDataComponent = ({
           list.
         </div>
       )}
+
+      <ClipboardPasteModalComponent
+        open={isShowPasteModal}
+        onSubmit={(text) => {
+          setIsShowPasteModal(false);
+          applyConnectionString(text);
+        }}
+        onCancel={() => setIsShowPasteModal(false)}
+      />
     </div>
   );
 };

@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import { IS_CLOUD } from '../../../../constants';
 import { type Database, PostgresBackupType, databaseApi } from '../../../../entity/databases';
 import { ConnectionStringParser } from '../../../../entity/databases/model/postgresql/ConnectionStringParser';
+import { ClipboardHelper } from '../../../../shared/lib/ClipboardHelper';
 import { ToastHelper } from '../../../../shared/toast';
+import { ClipboardPasteModalComponent } from '../../../../shared/ui';
 
 interface Props {
   database: Database;
@@ -54,42 +56,53 @@ export const EditPostgreSqlSpecificDataComponent = ({
 
   const [hasAutoAddedPublicSchema, setHasAutoAddedPublicSchema] = useState(false);
 
+  const [isShowPasteModal, setIsShowPasteModal] = useState(false);
+
+  const applyConnectionString = (text: string) => {
+    const trimmedText = text.trim();
+
+    if (!trimmedText) {
+      message.error('Clipboard is empty');
+      return;
+    }
+
+    const result = ConnectionStringParser.parse(trimmedText);
+
+    if ('error' in result) {
+      message.error(result.error);
+      return;
+    }
+
+    if (!editingDatabase?.postgresql) return;
+
+    const updatedDatabase: Database = {
+      ...editingDatabase,
+      postgresql: {
+        ...editingDatabase.postgresql,
+        host: result.host,
+        port: result.port,
+        username: result.username,
+        password: result.password,
+        database: result.database,
+        isHttps: result.isHttps,
+        cpuCount: 1,
+      },
+    };
+
+    setEditingDatabase(autoAddPublicSchemaForSupabase(updatedDatabase));
+    setIsConnectionTested(false);
+    message.success('Connection string parsed successfully');
+  };
+
   const parseFromClipboard = async () => {
+    if (!ClipboardHelper.isClipboardApiAvailable()) {
+      setIsShowPasteModal(true);
+      return;
+    }
+
     try {
-      const text = await navigator.clipboard.readText();
-      const trimmedText = text.trim();
-
-      if (!trimmedText) {
-        message.error('Clipboard is empty');
-        return;
-      }
-
-      const result = ConnectionStringParser.parse(trimmedText);
-
-      if ('error' in result) {
-        message.error(result.error);
-        return;
-      }
-
-      if (!editingDatabase?.postgresql) return;
-
-      const updatedDatabase: Database = {
-        ...editingDatabase,
-        postgresql: {
-          ...editingDatabase.postgresql,
-          host: result.host,
-          port: result.port,
-          username: result.username,
-          password: result.password,
-          database: result.database,
-          isHttps: result.isHttps,
-          cpuCount: 1,
-        },
-      };
-
-      setEditingDatabase(autoAddPublicSchemaForSupabase(updatedDatabase));
-      setIsConnectionTested(false);
-      message.success('Connection string parsed successfully');
+      const text = await ClipboardHelper.readFromClipboard();
+      applyConnectionString(text);
     } catch {
       message.error('Failed to read clipboard. Please check browser permissions.');
     }
@@ -603,6 +616,15 @@ export const EditPostgreSqlSpecificDataComponent = ({
     <div>
       {renderBackupTypeSelector()}
       {renderFormContent()}
+
+      <ClipboardPasteModalComponent
+        open={isShowPasteModal}
+        onSubmit={(text) => {
+          setIsShowPasteModal(false);
+          applyConnectionString(text);
+        }}
+        onCancel={() => setIsShowPasteModal(false)}
+      />
     </div>
   );
 };

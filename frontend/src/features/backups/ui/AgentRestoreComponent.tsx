@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getApplicationServer } from '../../../constants';
 import { type Backup, PgWalBackupType } from '../../../entity/backups';
 import { type Database } from '../../../entity/databases';
+import { ClipboardHelper } from '../../../shared/lib/ClipboardHelper';
 import { getUserTimeFormat } from '../../../shared/time';
 
 interface Props {
@@ -26,7 +27,7 @@ export const AgentRestoreComponent = ({ database, backup }: Props) => {
 
   const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await ClipboardHelper.copyToClipboard(text);
       message.success('Copied to clipboard');
     } catch {
       message.error('Failed to copy');
