@@ -280,7 +280,6 @@ func (n *BackuperNode) MakeBackup(backupID uuid.UUID, isCallNotifier bool) {
 		return
 	}
 
-	backup.Status = backups_core.BackupStatusCompleted
 	backup.BackupDurationMs = time.Since(start).Milliseconds()
 
 	// Update backup with encryption metadata if provided
@@ -297,12 +296,6 @@ func (n *BackuperNode) MakeBackup(backupID uuid.UUID, isCallNotifier bool) {
 		backup.Encryption = backupMetadata.Encryption
 	}
 
-	if err := n.backupRepository.Save(backup); err != nil {
-		n.logger.Error("Failed to save backup", "error", err)
-		return
-	}
-
-	// Save metadata file to storage
 	if backupMetadata != nil {
 		metadataJSON, err := json.Marshal(backupMetadata)
 		if err != nil {
@@ -333,6 +326,13 @@ func (n *BackuperNode) MakeBackup(backupID uuid.UUID, isCallNotifier bool) {
 				)
 			}
 		}
+	}
+
+	backup.Status = backups_core.BackupStatusCompleted
+
+	if err := n.backupRepository.Save(backup); err != nil {
+		n.logger.Error("Failed to save backup", "error", err)
+		return
 	}
 
 	// Update database last backup time

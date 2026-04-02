@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"databasus-backend/internal/config"
 	audit_logs "databasus-backend/internal/features/audit_logs"
@@ -1516,14 +1517,14 @@ func Test_MakeBackup_VerifyBackupAndMetadataFilesExistInStorage(t *testing.T) {
 	encryptor := encryption.GetFieldEncryptor()
 
 	backupFile, err := backupStorage.GetFile(encryptor, backup.FileName)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	backupFile.Close()
 
 	metadataFile, err := backupStorage.GetFile(encryptor, backup.FileName+".metadata")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	metadataContent, err := io.ReadAll(metadataFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	metadataFile.Close()
 
 	var storageMetadata backups_common.BackupMetadata
