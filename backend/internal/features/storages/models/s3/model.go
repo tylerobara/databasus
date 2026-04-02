@@ -43,9 +43,10 @@ type S3Storage struct {
 	S3SecretKey string    `json:"s3SecretKey" gorm:"not null;type:text;column:s3_secret_key"`
 	S3Endpoint  string    `json:"s3Endpoint"  gorm:"type:text;column:s3_endpoint"`
 
-	S3Prefix                string `json:"s3Prefix"                gorm:"type:text;column:s3_prefix"`
-	S3UseVirtualHostedStyle bool   `json:"s3UseVirtualHostedStyle" gorm:"default:false;column:s3_use_virtual_hosted_style"`
-	SkipTLSVerify           bool   `json:"skipTLSVerify"           gorm:"default:false;column:skip_tls_verify"`
+	S3Prefix                string         `json:"s3Prefix"                gorm:"type:text;column:s3_prefix"`
+	S3UseVirtualHostedStyle bool           `json:"s3UseVirtualHostedStyle" gorm:"default:false;column:s3_use_virtual_hosted_style"`
+	SkipTLSVerify           bool           `json:"skipTLSVerify"           gorm:"default:false;column:skip_tls_verify"`
+	S3StorageClass          S3StorageClass `json:"s3StorageClass"          gorm:"type:text;column:s3_storage_class;default:''"`
 }
 
 func (s *S3Storage) TableName() string {
@@ -76,7 +77,7 @@ func (s *S3Storage) SaveFile(
 		ctx,
 		s.S3Bucket,
 		objectKey,
-		minio.PutObjectOptions{},
+		s.putObjectOptions(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate multipart upload: %w", err)
@@ -151,15 +152,16 @@ func (s *S3Storage) SaveFile(
 		if err != nil {
 			return err
 		}
+		opts := s.putObjectOptions()
+		opts.SendContentMd5 = true
+
 		_, err = client.PutObject(
 			ctx,
 			s.S3Bucket,
 			objectKey,
 			bytes.NewReader([]byte{}),
 			0,
-			minio.PutObjectOptions{
-				SendContentMd5: true,
-			},
+			opts,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to upload empty file: %w", err)
@@ -173,7 +175,7 @@ func (s *S3Storage) SaveFile(
 		objectKey,
 		uploadID,
 		parts,
-		minio.PutObjectOptions{},
+		s.putObjectOptions(),
 	)
 	if err != nil {
 		_ = coreClient.AbortMultipartUpload(ctx, s.S3Bucket, objectKey, uploadID)
@@ -350,6 +352,7 @@ func (s *S3Storage) Update(incoming *S3Storage) {
 	s.S3Endpoint = incoming.S3Endpoint
 	s.S3UseVirtualHostedStyle = incoming.S3UseVirtualHostedStyle
 	s.SkipTLSVerify = incoming.SkipTLSVerify
+	s.S3StorageClass = incoming.S3StorageClass
 
 	if incoming.S3AccessKey != "" {
 		s.S3AccessKey = incoming.S3AccessKey
@@ -361,6 +364,12 @@ func (s *S3Storage) Update(incoming *S3Storage) {
 
 	// we do not allow to change the prefix after creation,
 	// otherwise we will have to transfer all the data to the new prefix
+}
+
+func (s *S3Storage) putObjectOptions() minio.PutObjectOptions {
+	return minio.PutObjectOptions{
+		StorageClass: string(s.S3StorageClass),
+	}
 }
 
 func (s *S3Storage) buildObjectKey(fileName string) string {

@@ -312,8 +312,6 @@ if [ "\$CURRENT_UID" != "\$PUID" ]; then
     usermod -o -u "\$PUID" postgres
 fi
 
-chown -R postgres:postgres /var/run/postgresql
-
 # PostgreSQL 17 binary paths
 PG_BIN="/usr/lib/postgresql/17/bin"
 
@@ -426,7 +424,12 @@ fi
 # Function to start PostgreSQL and wait for it to be ready
 start_postgres() {
     echo "Starting PostgreSQL..."
-    gosu postgres \$PG_BIN/postgres -D /databasus-data/pgdata -p 5437 &
+    # -k /tmp: create Unix socket and lock file in /tmp instead of /var/run/postgresql/.
+    # On NAS systems (e.g. TrueNAS Scale), the ZFS-backed Docker overlay filesystem
+    # ignores chown/chmod on directories from image layers, so PostgreSQL gets
+    # "Permission denied" when creating .s.PGSQL.5437.lock in /var/run/postgresql/.
+    # All internal connections use TCP (-h localhost), so the socket location does not matter.
+    gosu postgres \$PG_BIN/postgres -D /databasus-data/pgdata -p 5437 -k /tmp &
     POSTGRES_PID=\$!
     
     echo "Waiting for PostgreSQL to be ready..."

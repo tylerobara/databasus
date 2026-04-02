@@ -111,6 +111,18 @@ func Test_Storage_BasicOperations(t *testing.T) {
 			},
 		},
 		{
+			name: "S3Storage_WithStorageClass",
+			storage: &s3_storage.S3Storage{
+				StorageID:      uuid.New(),
+				S3Bucket:       s3Container.bucketName,
+				S3Region:       s3Container.region,
+				S3AccessKey:    s3Container.accessKey,
+				S3SecretKey:    s3Container.secretKey,
+				S3Endpoint:     "http://" + s3Container.endpoint,
+				S3StorageClass: s3_storage.S3StorageClassStandard,
+			},
+		},
+		{
 			name: "NASStorage",
 			storage: &nas_storage.NASStorage{
 				StorageID: uuid.New(),

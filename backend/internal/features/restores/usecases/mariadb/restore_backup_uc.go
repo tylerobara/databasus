@@ -70,6 +70,14 @@ func (uc *RestoreMariadbBackupUsecase) Execute(
 		"--verbose",
 	}
 
+	// Disable Galera Cluster replication for the restore session to prevent
+	// "Maximum writeset size exceeded" errors on large restores.
+	// wsrep_on is available in MariaDB 10.1+ (all builds with Galera support).
+	// On non-Galera instances the variable still exists but is a no-op.
+	if mdb.Version != tools.MariadbVersion55 {
+		args = append(args, "--init-command=SET SESSION wsrep_on=OFF")
+	}
+
 	if !config.GetEnv().IsCloud {
 		args = append(args, "--max-allowed-packet=1G")
 	}
@@ -375,6 +383,13 @@ func (uc *RestoreMariadbBackupUsecase) handleMariadbRestoreError(
 	if containsIgnoreCase(stderrStr, "timeout") {
 		return fmt.Errorf(
 			"MariaDB connection timeout. stderr: %s",
+			stderrStr,
+		)
+	}
+
+	if containsIgnoreCase(stderrStr, "writeset size exceeded") {
+		return fmt.Errorf(
+			"MariaDB Galera Cluster writeset size limit exceeded. Try increasing wsrep_max_ws_size on your cluster nodes. stderr: %s",
 			stderrStr,
 		)
 	}
